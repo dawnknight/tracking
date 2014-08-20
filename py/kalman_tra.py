@@ -156,12 +156,7 @@ def Kalman_update(ori,length,frame,flag):
         x[vid_idx,:] = x[vid_idx-1,:]
 
     left.set_data(frame[:,:,::-1])
-    plt.draw()
-
-
-    im = Image.fromarray(frame[:,:,::-1].astype(np.uint8))
-    im.save('/home/andyc/image/tracking VIDEO0004/color/c%.3d.jpg'%vid_idx)
-        
+    plt.draw()        
 
 
 def Fg_extract(frame): #extract foreground    
