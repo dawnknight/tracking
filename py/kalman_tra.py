@@ -26,69 +26,53 @@ u = asarray([[0,0,0,0]]).T     #[ax,ay,ax,ay] accelation
 
 kfinit=0
 x = np.zeros([2204,4])
-idx = 0
 vid_idx=0
 
 ori = asarray([[0,0,0,0]]) 
 ori_old = asarray([[0,0,0,0]]) 
+len_old = [0,0]
 
 flag = 1
+I = np.eye(4)
+
 
 def coor_extract(idx,lab_mtx,frame,coor):
     global ori 
+    global len_old
     if len(idx)==0:        
         left.set_data(frame[:,:,::-1])
         plt.draw()
         ori = ori_old 
-        length   = [0,0]
-        flag = 0 
+        length = len_old 
+        flag = 0
     else: 
-        flag = 1 
+        flag = 1
         #for i in range(len(idx)):
-        if 1: 
-            #print("i value")
-            #print(i)
-            ulx = asarray(coor[idx[0]][1]).min()
-            lrx = asarray(coor[idx[0]][1]).max()
-            uly = asarray(coor[idx[0]][0]).min()
-            lry = asarray(coor[idx[0]][0]).max()
         
-            #centroid = [(uly+lry)/2,(ulx+lrx)/2]
-            #length   = [lry-uly,lrx-ulx]
+        ulx = asarray(coor[idx[0]][1]).min()
+        lrx = asarray(coor[idx[0]][1]).max()
+        uly = asarray(coor[idx[0]][0]).min()
+        lry = asarray(coor[idx[0]][0]).max()
+        
+        #centroid = [(uly+lry)/2,(ulx+lrx)/2]
+        #length   = [lry-uly,lrx-ulx]
        
-            ori[:,0:2] = [uly,ulx]
-            ori[:,2:]  = ori[:,0:2]-ori_old[:,0:2] #velocity
-            length   = [lry-uly,lrx-ulx]     
+        ori[:,0:2] = [uly,ulx]
+        ori[:,2:]  = ori[:,0:2]-ori_old[:,0:2] #velocity
+        length   = [lry-uly,lrx-ulx]     
             
-            print("Bbox size")
-            print(length[0],length[1])
+        #print("Bbox size")
+        #print(length[0],length[1])
 
-            #draw
+        #draw
+        cv2.rectangle(frame,(ulx,uly),(lrx,lry),(0,255,0),1)
+            
+        left.set_data(frame[:,:,::-1])
+        plt.draw()
+        ori_old[:] = ori
+        len_old = length
 
-            frame[uly,ulx:lrx,0] = 0
-            frame[uly,ulx:lrx,1] = 176
-            frame[uly,ulx:lrx,2] = 0
-
-            frame[lry,ulx:lrx,0] = 0
-            frame[lry,ulx:lrx,1] = 176
-            frame[lry,ulx:lrx,2] = 0
-            
-            frame[uly:lry,ulx,0] = 0
-            frame[uly:lry,ulx,1] = 176
-            frame[uly:lry,ulx,2] = 0
-            
-            frame[uly:lry,lrx,0] = 0
-            frame[uly:lry,lrx,1] = 176
-            frame[uly:lry,lrx,2] = 0
-            
-            left.set_data(frame[:,:,::-1])
-            plt.draw()
     Kalman_update(ori,length,frame,flag)
-    ori_old[:] = ori
-    
-    print("flag # ")
-    print(flag)
-
   
 def Kalman_update(ori,length,frame,flag):
 
@@ -101,41 +85,25 @@ def Kalman_update(ori,length,frame,flag):
     global vid_idx
     global u
 
-    if flag:
+    if kfinit == 0 :        
+        xp = np.array([[0,0,0,0]]).T                   #predict x(initial)
+        kfinit =1
+    else: 
+        xp = np.dot(A,np.array([x[vid_idx-1,:]]).T)+np.dot(B,u) #predict x
 
-        if kfinit == 0 :
-            #xp = np.array([[frame.shape[1]/2,frame.shape[0]/2,0,0]]).T
-            xp = np.array([[0,0,0,0]]).T                   #predict x(initial)
-        else: 
-            xp = np.dot(A,np.array([x[vid_idx-1,:]]).T)+np.dot(B,u) #predict x
- 
+    ulx = float(round(xp[1]))
+    lrx = float(round(xp[1]+length[1]))
+    uly = float(round(xp[0]))
+    lry = float(round(xp[0]+length[0]))
 
-        ulx = float(round(xp[1]))
-        lrx = float(round(xp[1]+length[1]))
-        uly = float(round(xp[0]))
-        lry = float(round(xp[0]+length[0]))
+    # draw predict
 
-        # draw predict
+    if ((ulx>=0.0) & (uly>=0.0) & (lrx<frame.shape[1]) & (lry<frame.shape[0])):
 
-        if ((ulx>=0.0) & (uly>=0.0) & (lrx<frame.shape[1]) & (lry<frame.shape[0])):
+        cv2.rectangle(frame,(int(ulx),int(uly)),(int(lrx),int(lry)),(0,0,255),1)
 
-            frame[uly,ulx:lrx,0] = 0
-            frame[uly,ulx:lrx,1] = 0
-            frame[uly,ulx:lrx,2] = 255
+    if flag ==1:
 
-            frame[lry,ulx:lrx,0] = 0
-            frame[lry,ulx:lrx,1] = 0
-            frame[lry,ulx:lrx,2] = 255
-
-            frame[uly:lry,ulx,0] = 0
-            frame[uly:lry,ulx,1] = 0
-            frame[uly:lry,ulx,2] = 255
-
-            frame[uly:lry,lrx,0] = 0
-            frame[uly:lry,lrx,1] = 0
-            frame[uly:lry,lrx,2] = 255
-         
-        kfinit = 1
 
         PP = np.dot(np.dot(A,P),A.T)+Q                    #covariance  
         Y = ori.T-np.dot(H,xp)                            #residual 
@@ -143,20 +111,34 @@ def Kalman_update(ori,length,frame,flag):
         K = np.dot(np.dot(PP,H.T),np.linalg.inv(S))       #kalman gain     
         #update  state & covariance
         x[vid_idx,:] = (xp+np.dot(K,Y)).T
-        P = np.dot((np.eye(4)-np.dot(K,H)),PP)
+        P = np.dot((I-np.dot(K,H)),PP)
         #update velocity & accelation
         if vid_idx>0:
+
             x[vid_idx,2] = x[vid_idx,0]-x[vid_idx-1,0]
             x[vid_idx,3] = x[vid_idx,1]-x[vid_idx-1,1]
             u = asarray([[x[vid_idx,2]-x[vid_idx-1,2],\
                           x[vid_idx,3]-x[vid_idx-1,3],\
                           x[vid_idx,2]-x[vid_idx-1,2],\
                           x[vid_idx,3]-x[vid_idx-1,3]]]).T 
-    else:
-        x[vid_idx,:] = x[vid_idx-1,:]
+
+    else: # if measument  can not obtain
+
+        x[vid_idx,:] = xp.T
+        if vid_idx>0:
+            x[vid_idx,2] = x[vid_idx-1,2]
+            x[vid_idx,3] = x[vid_idx-1,3]
+            u = asarray([[x[vid_idx-1,2]-x[vid_idx-2,2],\
+                          x[vid_idx-1,3]-x[vid_idx-2,3],\
+                          x[vid_idx-1,2]-x[vid_idx-2,2],\
+                          x[vid_idx-1,3]-x[vid_idx-2,3]]]).T
+
 
     left.set_data(frame[:,:,::-1])
     plt.draw()        
+
+    imc = Image.fromarray(frame[:,:,::-1].astype(np.uint8))
+    imc.save('/home/andyc/image/tracking VIDEO0004/color/c%.3d.jpg'%vid_idx)
 
 
 def Fg_extract(frame): #extract foreground    
@@ -177,6 +159,17 @@ def Fg_extract(frame): #extract foreground
     right.set_data(fgf)
     plt.draw()
 
+    im = zeros(frame.shape)
+    a = fgf.astype(np.uint8)*255
+    im[:,:,0]=a
+    im[:,:,1]=a
+    im[:,:,2]=a
+
+    im = Image.fromarray(im.astype(np.uint8))
+    im.save('/home/andyc/image/tracking VIDEO0004/binary/b%.3d.jpg'%vid_idx)
+
+
+
     return fgf
         
 def objextract(Fg):
@@ -185,72 +178,36 @@ def objextract(Fg):
     labeled_array, num_features = nd.measurements.label(Fg, structure=s)
     coor = []
     cnt = []
-    lth = 100   # label pixel number less than lth will be removed
-    Lth = 60000
-    for i in range(1,num_features+1):
-        coor.append(np.where(labeled_array==i))
-        cnt.append(len(np.where(labeled_array==i)[1]))
 
-    idx = list(set(np.where(asarray(cnt)<Lth)[0]).intersection\
-                  (np.where(asarray(cnt)>lth)[0]))
+    if num_features ==1:
+       idx = []
+    else:    
+        lth = 200   # label pixel number less than lth will be removed
+        Lth = 60000
+        for i in range(1,num_features+1):
+            coor.append(np.where(labeled_array==i))
+            cnt.append(len(np.where(labeled_array==i)[1]))
 
-    idx_max = 0
-    for ii in range(len(idx)):
-        if cnt[idx[ii]]>idx_max:
-            idx_max = idx[ii]
-    if idx_max == 0:
-        idx = [] 
-    else:
-        idx = [idx_max]
+        #idx = list(set(np.where(asarray(cnt)<Lth)[0]).intersection\
+        #              (np.where(asarray(cnt)>lth)[0]))
+        cnt = array(cnt)
+        idx = arange(num_features)
+        idx = idx[(cnt<Lth)&(cnt>lth)]
+      
+        if len(idx) == 0:
+            idx = []
+        else:
+            idx_max = 0
+            for ii in range(len(idx)):
+                if cnt[idx[ii]]>idx_max:
+                    idx_max = idx[ii]
+            if idx_max == 0:
+                idx = [] 
+            else:
+                idx = [idx_max]
 
     return idx,labeled_array,coor,cnt
 
-
-
-
-'''
-def Main():
-    global vid_idx
-    try:
-        vid
-    except:
-        print('reading video...')
-        cap = cv2.VideoCapture('/home/andyc/VIDEO0004.mp4')
-        vid = []
-
-        if cap.isOpened():
-            rval,frame = cap.read()
-        else:
-            rval = False
-        while rval:
-            rval,frame = cap.read()
-            if rval: 
-                frame = cv2.resize(frame,(0,0),fx = 0.25,fy=0.25)
-                vid.append(frame) 
-        print('done reading video...')
-
-    mu       = np.zeros(vid[0].shape,dtype=float)
-    mu_old   = np.zeros(vid[0].shape,dtype=float)
-    sig2     = np.zeros(vid[0].shape,dtype=float)
-    sig2_old = np.zeros(vid[0].shape,dtype=float) 
-
-    plt.figure(1,figsize=[20,10])
-    plt.subplot(121)
-    left = plt.imshow(vid[0][:,:,::-1])
-    plt.subplot(122)
-    right = plt.imshow(mu,clim=[0,1],cmap = 'gist_gray',interpolation='nearest')
-
-
-    for frame in vid:
-        print(vid_idx)
-        Fg = Fg_extract(frame,mu,mu_old,sig2,sig2_old)
-        idx,lab_mtx,coor = objextract(Fg)
-        coor_extract(idx,lab_mtx,frame,coor)
-        #time.sleep(1)
-        vid_idx = vid_idx+1
-Main()
-
-'''
 try:
     vid
 except:
@@ -283,9 +240,7 @@ plt.subplot(122)
 right = plt.imshow(mu,clim=[0,1],cmap = 'gist_gray',interpolation='nearest')
 
 
-#for frame in vid:
-for i in range(933):
-    frame = vid[i]
+for frame in vid:
     print("frame no")
     print(vid_idx)
     Fg = Fg_extract(frame)
