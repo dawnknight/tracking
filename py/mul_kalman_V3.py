@@ -107,7 +107,7 @@ def Objextract(Fg):
             idx = []
         elif len(idx)>1:              
             #idx = [idx[cnt[idx].argmax()]]
-            idx = sorted(range(len(cnt)),key=lambda x:cnt[x])[::-1]
+            idx = sorted(range(len(cnt)),key=lambda x:cnt[x])[::-1][0:len(idx)]
     
     return idx,labeled_array,coor,cnt
 
@@ -154,9 +154,12 @@ def Coor_Extract(idx,lab_mtx,frame,coor):
 
     left.set_data(frame[:,:,::-1])
     plt.draw()
+  
+    print('idx number is {0} blobs number is {1}'.format(len(idx),len(blobs)))
 
-    #Kalman_update(ori,length,frame,flag)
-
+    if len(idx)>0 or len(blobs)>0:
+        Kalman_update(ori,length,frame,flag)
+    
 def Kalman_update(ori,length,frame,flag):
 
     #global kfinit
@@ -324,8 +327,7 @@ right = plt.imshow(mu,clim=[0,1],cmap = 'gist_gray',interpolation='nearest')
 
 
 for frame in vid:
-    print("frame no")
-    print(vid_idx)
+    print("frame no : {0}".format(vid_idx))
     #frame = frame[:,:,::-1]
     Fg = Fg_Extract(frame,2)
     idx,lab_mtx,coor,cnt = Objextract(Fg)
