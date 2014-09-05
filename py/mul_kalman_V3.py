@@ -35,6 +35,7 @@ imsave = 0
 
 blobs = {}
 obj_idx = 0
+exist_blobs = 0
 
 class Blob(): #create a new blob                                                                                                          
 
@@ -45,10 +46,11 @@ class Blob(): #create a new blob
         self.u  = array([[0,0,0,0]]).T
         self.P = 100*np.eye(4)
         self.Trj = []
-        self.len = [0,0]       #Bbox size                                                                                                
+        self.len = [0,0]                #Bbox size                                                                                       
         self.ref = array([[0,0,0,0]])   #Bbox position and velocity x,y,vx,vy                                                          
-        self.status = 0 # 0 : as initial  1 : as live  2 : as dead                                                                     
-        self.dtime = 0  # obj dispear period                                                                                             
+        self.ori = []                   #Bbox measurment position
+        self.status = 0                 # 0 : as initial  1 : as live  2 : as dead     
+        self.dtime = 0                  # obj dispear period                                                                              
 
     def Color(self):    #initial Blob color                                                                                               
         try:
@@ -118,6 +120,7 @@ def Coor_Extract(idx,lab_mtx,frame,coor):
     global len_old
 
     #if len(idx)<len(blobs):
+    ori = {}
 
     if len(idx)==0:        
         flag = 0
@@ -129,30 +132,27 @@ def Coor_Extract(idx,lab_mtx,frame,coor):
             lrx = int(array(coor[idx[i]][1]).max())
             uly = int(array(coor[idx[i]][0]).min())
             lry = int(array(coor[idx[i]][0]).max())
-        
-            try:
-                ori[i]
-            except:
-                ori[i] = array([0,0,0,0])
-                ori_old[i] = array([0,0,0,0])
-                length[i] = [0,0]
+                        
+            ori[i] = array([0,0,0,0])
+            ori_old[i] = array([0,0,0,0])
+            length[i] = [0,0]
 
             ori[i][0:2] = [uly,ulx]
-            ori[i][2:]  = [p-q for p,q in zip(ori[i][0:2],ori_old[i][0:2])] #velocity
+            #ori[i][2:]  = [p-q for p,q in zip(ori[i][0:2],ori_old[i][0:2])] #velocity
             length[i]   = [lry-uly,lrx-ulx]     
 
             #draw
             #pdb.set_trace()
             cv2.rectangle(frame,(ulx,uly),(lrx,lry),(0,255,0),1)
             
-            ori_old[i] = copy.deepcopy(ori[i])
+            #ori_old[i] = copy.deepcopy(ori[i])
             #len_old[i] = length[i]
 
     left.set_data(frame[:,:,::-1])
     plt.draw()
   
     print('idx number is {0} blobs number is {1}'.format(len(idx),len(blobs)))
-
+    print('There are {0} live blobs'.format(exist_blobs))
     if (len(idx)>0 or len(blobs)>0):
         Kalman_update(ori,length,frame,flag)
     
@@ -168,13 +168,18 @@ def Kalman_update(ori,length,frame,flag):
     global u
     global blobs
     global obj_idx
+    global exist_blobs
 
     xcor = []
     ycor = []              
     blob_idx = [] 
 
-    for i in range(len(ori)-len(blobs)):           #if new objs come in  
-        blobs[obj_idx] = Blob(frame.shape)         #initialize new blob                                                               
+    if vid_idx == 89:
+       pdb.set_trace()    
+
+    for i in range(len(ori)-exist_blobs):           #if new objs come in  
+        blobs[obj_idx] = Blob(frame.shape)         #initialize new blob                                                             
+        exist_blobs+=1
         obj_idx += 1   
 
     for i in range(len(blobs)): 
@@ -205,21 +210,35 @@ def Kalman_update(ori,length,frame,flag):
     if len(ori)>1: 
         order = Objmatch(ycor,xcor,ori,len(ori),len(blob_idx))
     elif len(ori) ==1: 
-        order = [(0,0)] 
-        
+        order = [(0,0)]
+    #if vid_idx ==71:
+    #   pdb.set_trace() 
+
+    if (len(ori)<len(blob_idx)) & (len(ori)!=0):
+        blob_idx = list(set([a[1] for a in order]) & set(blob_idx))      #find common term between 2 lists 
+    
+  
 
     for i,j in zip(blob_idx,range(len(blob_idx))):                  
         #pdb.set_trace()
         if len(ori)!=0:
+            try:
+                ori[order[j][1]][2:] = array([ori[order[j][1]][0:2]])-blobs[i].ref[0:2]  #measure the velocity
+            except:
+                ori[order[j][1]][2:] = array([ori[order[j][1]][0:2]])
+
             if len(ori) == len(blob_idx):
                 blobs[i].ref = array([ori[order[j][1]]])
                 blobs[i].len = length[order[j][1]]
             elif len(ori) < len(blob_idx) :          #objs outside the view 
+
                 if i in array(order)[:,1]:
                     blobs[i].ref = array([ori[order[j][1]]])   
                     blobs[i].len = length[order[j][1]]   
                 else:
                     blobs[i].dtime += 1  
+                    if blobs[i].dtime ==5:
+                        exist_blobs -=1 
 
         ulx = int(round(blobs[i].xp[1]))
         lrx = int(round(blobs[i].xp[1]+blobs[i].len[1]))
