@@ -35,7 +35,7 @@ imsave = 0
 
 blobs = {}
 obj_idx = 0
-exist_blobs = 0
+live_blobs = []
 
 class Blob(): #create a new blob                                                                                                          
 
@@ -152,7 +152,7 @@ def Coor_Extract(idx,lab_mtx,frame,coor):
     plt.draw()
   
     print('idx number is {0} blobs number is {1}'.format(len(idx),len(blobs)))
-    print('There are {0} live blobs'.format(exist_blobs))
+    print('There are {0} live blobs'.format(len(live_blobs) ))
     if (len(idx)>0 or len(blobs)>0):
         Kalman_update(ori,length,frame,flag)
     
@@ -168,18 +168,18 @@ def Kalman_update(ori,length,frame,flag):
     global u
     global blobs
     global obj_idx
-    global exist_blobs
+    global live_blobs
 
     xcor = []
     ycor = []              
     blob_idx = [] 
 
-    if vid_idx == 89:
-       pdb.set_trace()    
+    #if vid_idx == 89:
+    #   pdb.set_trace()    
 
-    for i in range(len(ori)-exist_blobs):           #if new objs come in  
+    for i in range(len(ori)-len(live_blobs)):           #if new objs come in  
         blobs[obj_idx] = Blob(frame.shape)         #initialize new blob                                                             
-        exist_blobs+=1
+        live_blobs.append(obj_idx)
         obj_idx += 1   
 
     for i in range(len(blobs)): 
@@ -204,7 +204,7 @@ def Kalman_update(ori,length,frame,flag):
            Objmatch(yori,xori,blob[i].x[0][0:2],1,len(yori))
            '''  
            blobs[i].status = 2  
-     
+           live_blobs = list(set(live_blobs).difference([i]))
 
 
     if len(ori)>1: 
@@ -237,8 +237,6 @@ def Kalman_update(ori,length,frame,flag):
                     blobs[i].len = length[order[j][1]]   
                 else:
                     blobs[i].dtime += 1  
-                    if blobs[i].dtime ==5:
-                        exist_blobs -=1 
 
         ulx = int(round(blobs[i].xp[1]))
         lrx = int(round(blobs[i].xp[1]+blobs[i].len[1]))
