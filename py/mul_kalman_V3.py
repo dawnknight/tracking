@@ -1,12 +1,12 @@
 #kalman tracking
 import numpy as np
-import cv2,pickle,time
+import cv2,pickle,time,pdb,copy
 import scipy.ndimage.morphology as ndm
 import scipy.ndimage as nd
 import numpy.random as rand
 from PIL import Image
 from munkres import Munkres
-import pdb
+
 
 #bg parameters
 alpha    = 0.01
@@ -117,15 +117,11 @@ def Coor_Extract(idx,lab_mtx,frame,coor):
     global length
     global len_old
 
+    #if len(idx)<len(blobs):
+
     if len(idx)==0:        
         flag = 0
-        #if kfinit != 0:        
-        #    ori = ori_old 
-        #    length = len_old
-        #else:
-        #    kupdate = 0   #No need do the kalman update     
     else: 
-
         flag = 1
         for i in range(len(idx)):
         
@@ -149,7 +145,7 @@ def Coor_Extract(idx,lab_mtx,frame,coor):
             #pdb.set_trace()
             cv2.rectangle(frame,(ulx,uly),(lrx,lry),(0,255,0),1)
             
-            ori_old[i] = ori[i]
+            ori_old[i] = copy.deepcopy(ori[i])
             #len_old[i] = length[i]
 
     left.set_data(frame[:,:,::-1])
@@ -157,7 +153,7 @@ def Coor_Extract(idx,lab_mtx,frame,coor):
   
     print('idx number is {0} blobs number is {1}'.format(len(idx),len(blobs)))
 
-    if len(idx)>0 or len(blobs)>0:
+    if (len(idx)>0 or len(blobs)>0):
         Kalman_update(ori,length,frame,flag)
     
 def Kalman_update(ori,length,frame,flag):
@@ -177,7 +173,7 @@ def Kalman_update(ori,length,frame,flag):
     ycor = []              
     blob_idx = [] 
 
-    for i in range(len(ori)-len(blob_idx)):         #if new objs come in  
+    for i in range(len(ori)-len(blobs)):           #if new objs come in  
         blobs[obj_idx] = Blob(frame.shape)         #initialize new blob                                                               
         obj_idx += 1   
 
@@ -191,7 +187,20 @@ def Kalman_update(ori,length,frame,flag):
             ycor.append(blobs[i].xp[0])
             blob_idx.append(i)
         else:
+           #print(blobs[i].x)
+           #print(blobs[i].xp)
+           #print(ori)
+           '''
+           xori = []   
+           yori = []
+           for jj in range(len(ori)):
+               xori.append(ori[jj][1])    
+               yori.append(ori[jj][0])
+           Objmatch(yori,xori,blob[i].x[0][0:2],1,len(yori))
+           '''  
            blobs[i].status = 2  
+     
+
 
     if len(ori)>1: 
         order = Objmatch(ycor,xcor,ori,len(ori),len(blob_idx))
@@ -287,7 +296,8 @@ def Objmatch(objy,objx,ref,L,W):
     #pdb.set_trace()                                                                                                                       
     for i in range(L):
         cmtx[i,:] =((objy - ref[i][0])**2+(objx - ref[i][1])**2).T
-
+    if vid_idx == 74:
+        pdb.set_trace()
     m = Munkres()
     indexes = m.compute(cmtx)
     return indexes
