@@ -40,8 +40,9 @@ live_blobs = []
 class Blob(): #create a new blob                                                                                                          
 
     def __init__(self,fshape):
-        self.x = []
-        self.x_old = []
+        self.x = []                #current status
+        self.x_old  = []           #previous 1 status
+        self.x_old2 = []           #previous 2 status
         self.xp = np.array([[randint(0,fshape[0]),randint(0,fshape[1]),0,0]]).T
         self.u  = array([[0,0,0,0]]).T
         self.P = 100*np.eye(4)
@@ -187,7 +188,7 @@ def Kalman_update(ori,length,frame,flag):
             if blobs[i].status ==0: 
                 blobs[i].status = 1
             else:
-                blobs[i].xp = np.dot(A,blobs[i].x.T)+np.dot(B,blobs[i].u)         
+                blobs[i].xp = np.dot(A,blobs[i].x_old.T)+np.dot(B,blobs[i].u)         
             xcor.append(blobs[i].xp[1])
             ycor.append(blobs[i].xp[0])
             blob_idx.append(i)
@@ -219,13 +220,14 @@ def Kalman_update(ori,length,frame,flag):
     
   
 
-    for i,j in zip(blob_idx,range(len(blob_idx))):                  
-        #pdb.set_trace()
+    for i,j in zip(blob_idx,range(len(blob_idx))):
+        #if vid_idx ==55:                  
+        #    pdb.set_trace()
         if len(ori)!=0:
-            try:
-                ori[order[j][1]][2:] = array([ori[order[j][1]][0:2]])-blobs[i].ref[0:2]  #measure the velocity
-            except:
-                ori[order[j][1]][2:] = array([ori[order[j][1]][0:2]])
+            #try:
+            ori[order[j][1]][2:] = array([ori[order[j][1]][0:2]])-blobs[i].ref[0][0:2]  #measure the velocity
+            #except:
+            #    ori[order[j][1]][2:] = array([ori[order[j][1]][0:2]])
 
             if len(ori) == len(blob_idx):
                 blobs[i].ref = array([ori[order[j][1]]])
@@ -284,18 +286,29 @@ def Kalman_update(ori,length,frame,flag):
             try :                                 
                 blobs[i].x[0][2] = blobs[i].x_old[0][2]
                 blobs[i].x[0][3] = blobs[i].x_old[0][3]
-                blobs[i].u = asarray([[blobs[i].x[0][2]-blobs[i].x_old[0][2],\
-                                       blobs[i].x[0][3]-blobs[i].x_old[0][3],\
-                                       blobs[i].x[0][2]-blobs[i].x_old[0][2],\
-                                       blobs[i].x[0][3]-blobs[i].x_old[0][3]]]).T
+                blobs[i].u = asarray([[blobs[i].x_old[0][2]-blobs[i].x_old2[0][2],\
+                                       blobs[i].x_old[0][3]-blobs[i].x_old2[0][3],\
+                                       blobs[i].x_old[0][2]-blobs[i].x_old2[0][2],\
+                                       blobs[i].x_old[0][3]-blobs[i].x_old2[0][3]]]).T
             except:
                 blobs[i].x[0][2] = blobs[i].x[0][0]
                 blobs[i].x[0][3] = blobs[i].x[0][1]
                 blobs[i].u = asarray([[blobs[i].x[0][2],\
                                        blobs[i].x[0][3],\
                                        blobs[i].x[0][2],\
-                                       blobs[i].x[0][3]]]).T 
+                                       blobs[i].x[0][3]]]).T
+ 
+        blobs[i].x_old2=blobs[i].x_old
         blobs[i].x_old=blobs[i].x   
+        
+        print("obj {0}".format(int(i)))
+        print("ref  \n {0}".format(blobs[i].ref))
+        print("x is \n {0}".format(blobs[i].x))
+        print("xp is\n {0}".format(blobs[i].xp.T))
+        #print(blobs[i].u)
+        
+
+        
 
     left.set_data(frame[:,:,::-1])
     plt.draw()       
