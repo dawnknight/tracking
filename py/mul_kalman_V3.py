@@ -1,6 +1,6 @@
 #kalman tracking
 import numpy as np
-import cv2,pickle,time,pdb,copy
+import cv2,pickle,pdb,copy
 import scipy.ndimage.morphology as ndm
 import scipy.ndimage as nd
 import numpy.random as rand
@@ -23,15 +23,11 @@ B = asarray([[0.5*dt**2,0,0,0],[0,0.5*dt**2,0,0],[0,0,dt,0],[0,0,0,dt]])
 
 vid_idx=0
 
-ori = {} 
-ori_old = {}
-length ={}
-#len_old = {}
-
 flag = 1
 I = np.eye(4)
 
 imsave = 0
+kill_Trj = 0
 
 blobs = {}
 obj_idx = 0
@@ -41,17 +37,17 @@ class Blob(): #create a new blob
 
     def __init__(self,fshape):
         self.x = []                #current status
-        self.x_old  = []           #previous 1 status
-        self.x_old2 = []           #previous 2 status
+        self.x_old  = []           #previous  status
         self.xp = np.array([[randint(0,fshape[0]),randint(0,fshape[1]),0,0]]).T
         self.u  = array([[0,0,0,0]]).T
         self.P = 100*np.eye(4)
-        self.Trj = []
+        self.Trj = {}
         self.len = [0,0]                #Bbox size                                                                                       
         self.ref = array([[0,0,0,0]])   #Bbox position and velocity x,y,vx,vy                                                          
         self.ori = []                   #Bbox measurment position
         self.status = 0                 # 0 : as initial  1 : as live  2 : as dead     
         self.dtime = 0                  # obj dispear period                                                                              
+        self.ivalue = []                # store intensity value in Bbox
 
     def Color(self):    #initial Blob color                                                                                               
         try:
@@ -109,18 +105,12 @@ def Objextract(Fg):
         if len(idx)==0:
             idx = []
         elif len(idx)>1:              
-            #idx = [idx[cnt[idx].argmax()]]
             idx = sorted(range(len(cnt)),key=lambda x:cnt[x])[::-1][0:len(idx)]
     
     return idx,labeled_array,coor,cnt
 
-def Coor_Extract(idx,lab_mtx,frame,coor):
-    global ori 
-    global ori_old
-    global length
-    global len_old
-
-    #if len(idx)<len(blobs):
+def Coor_Extract(idx,lab_mtx,frame,coor): 
+    length = {}
     ori = {}
 
     if len(idx)==0:        
@@ -135,31 +125,23 @@ def Coor_Extract(idx,lab_mtx,frame,coor):
             lry = int(array(coor[idx[i]][0]).max())
                         
             ori[i] = array([0,0,0,0])
-            ori_old[i] = array([0,0,0,0])
             length[i] = [0,0]
 
             ori[i][0:2] = [uly,ulx]
-            #ori[i][2:]  = [p-q for p,q in zip(ori[i][0:2],ori_old[i][0:2])] #velocity
             length[i]   = [lry-uly,lrx-ulx]     
 
-            #draw
-            #pdb.set_trace()
             cv2.rectangle(frame,(ulx,uly),(lrx,lry),(0,255,0),1)
-            
-            #ori_old[i] = copy.deepcopy(ori[i])
-            #len_old[i] = length[i]
 
     left.set_data(frame[:,:,::-1])
     plt.draw()
   
-    print('idx number is {0} blobs number is {1}'.format(len(idx),len(blobs)))
-    print('There are {0} live blobs'.format(len(live_blobs) ))
+    print(' idx number is {0} \n blobs number is {1}'.format(len(idx),len(blobs)))
+    print(' There are {0} live blobs\n\n'.format(len(live_blobs) ))
     if (len(idx)>0 or len(blobs)>0):
         Kalman_update(ori,length,frame,flag)
     
 def Kalman_update(ori,length,frame,flag):
 
-    #global kfinit
     global P
     global PP
     global K
@@ -174,12 +156,10 @@ def Kalman_update(ori,length,frame,flag):
     xcor = []
     ycor = []              
     blob_idx = [] 
-
-    #if vid_idx == 89:
-    #   pdb.set_trace()    
+    lines ={}
 
     for i in range(len(ori)-len(live_blobs)):           #if new objs come in  
-        blobs[obj_idx] = Blob(frame.shape)         #initialize new blob                                                             
+        blobs[obj_idx] = Blob(frame.shape)              #initialize new blob                                                             
         live_blobs.append(obj_idx)
         obj_idx += 1   
 
@@ -193,47 +173,26 @@ def Kalman_update(ori,length,frame,flag):
             ycor.append(blobs[i].xp[0])
             blob_idx.append(i)
         else:
-           #print(blobs[i].x)
-           #print(blobs[i].xp)
-           #print(ori)
-           '''
-           xori = []   
-           yori = []
-           for jj in range(len(ori)):
-               xori.append(ori[jj][1])    
-               yori.append(ori[jj][0])
-           Objmatch(yori,xori,blob[i].x[0][0:2],1,len(yori))
-           '''  
-           blobs[i].status = 2  
-           live_blobs = list(set(live_blobs).difference([i]))
-
-
+            blobs[i].status = 2  
+            live_blobs = list(set(live_blobs).difference([i]))
     if len(ori)>1: 
         order = Objmatch(ycor,xcor,ori,len(ori),len(blob_idx))
     elif len(ori) ==1: 
         order = [(0,0)]
-    #if vid_idx ==71:
-    #   pdb.set_trace() 
-
     if (len(ori)<len(blob_idx)) & (len(ori)!=0):
         blob_idx = list(set([a[1] for a in order]) & set(blob_idx))      #find common term between 2 lists 
-    
-  
 
-    for i,j in zip(blob_idx,range(len(blob_idx))):
-        #if vid_idx ==55:                  
-        #    pdb.set_trace()
+    #for i,j in zip(blob_idx,range(len(blob_idx))):
+    for j,i in enumerate(blob_idx):
         if len(ori)!=0:
-            #try:
+            if vid_idx == 187:
+                pdb.set_trace()
             ori[order[j][1]][2:] = array([ori[order[j][1]][0:2]])-blobs[i].ref[0][0:2]  #measure the velocity
-            #except:
-            #    ori[order[j][1]][2:] = array([ori[order[j][1]][0:2]])
 
             if len(ori) == len(blob_idx):
                 blobs[i].ref = array([ori[order[j][1]]])
                 blobs[i].len = length[order[j][1]]
             elif len(ori) < len(blob_idx) :          #objs outside the view 
-
                 if i in array(order)[:,1]:
                     blobs[i].ref = array([ori[order[j][1]]])   
                     blobs[i].len = length[order[j][1]]   
@@ -244,52 +203,58 @@ def Kalman_update(ori,length,frame,flag):
         lrx = int(round(blobs[i].xp[1]+blobs[i].len[1]))
         uly = int(round(blobs[i].xp[0]))
         lry = int(round(blobs[i].xp[0]+blobs[i].len[0]))
-
         # draw predict
-                
         if ((lrx>=0) & (lry>=0) & (ulx<frame.shape[1]) & (uly<frame.shape[0])): #at least part of the obj inside the view 
-            #pdb.set_trace() 
             cv2.rectangle(frame,(max(ulx,0) ,max(uly,0)),\
                                 (min(lrx,frame.shape[1]),min(lry,frame.shape[0])),\
-                                 blobs[i].Color(),1)             
+                                 blobs[i].Color(),1)
+
+            blobs[i].ivalue.append(frame[max(uly,0):min(lry,frame.shape[0]),\
+                                         max(ulx,0):min(lrx,frame.shape[1]),:].flatten().mean())  #avarge itensity value in Bbox   
+              
             try:
-               trj_tmp = blobs[i].Trj
-               trj_tmp.append( [ int(min(max(round((uly+lry)/2),0),frame.shape[0])),frame.shape[0],\
-                                 int(min(max(round((ulx+lrx)/2),0),frame.shape[1])),frame.shape[1]])
+               trj_tmpx = blobs[i].Trj['x']
+               trj_tmpy = blobs[i].Trj['y']
+               trj_tmpy.append( [ int(min(max(round((uly+lry)/2),0),frame.shape[0]))])
+               trj_tmpx.append( [ int(min(max(round((ulx+lrx)/2),0),frame.shape[1]))])
             except: 
-                trj_tmp = [[int(min(max(round((uly+lry)/2),0),frame.shape[0])),frame.shape[0],\
-                            int(min(max(round((ulx+lrx)/2),0),frame.shape[1])),frame.shape[1]]]
-            blobs[i].Trj = trj_tmp 
+                trj_tmpy = [[int(min(max(round((uly+lry)/2),0),frame.shape[0]))]]
+                trj_tmpx = [[int(min(max(round((ulx+lrx)/2),0),frame.shape[1]))]]
+            blobs[i].Trj['x'] = trj_tmpx
+            blobs[i].Trj['y'] = trj_tmpy
+
         else:      #obj outside the view
-            trj_tmp = blobs[i].Trj
-            trj_tmp.append(trj_tmp[-1])
-            blobs[i].Trj = trj_tmp
+            trj_tmpx = blobs[i].Trj['x']
+            trj_tmpy = blobs[i].Trj['y']
+            trj_tmpx.append(trj_tmpx[-1])
+            trj_tmpy.append(trj_tmpy[-1])
+            blobs[i].Trj['x'] = trj_tmpx
+            blobs[i].Trj['y'] = trj_tmpy
             blobs[i].dtime +=1 
-
-
-
-        if flag ==1:
-        
+        # Draw Trj
+        if (len(blobs[i].Trj)>4 & blobs[i].dtime<5):
+            plt.subplot(121)
+            lines = axL.plot(blobs[i].Trj['x'][4:],blobs[i].Trj['y'][4:],color = array(blobs[i].Color())/255.)
+            
+        if flag ==1:        
             PP = np.dot(np.dot(A,blobs[i].P),A.T)+Q                    #covariance  
             Y = blobs[i].ref.T-np.dot(H,blobs[i].xp)                            #residual 
             S = np.dot(np.dot(H,PP),H.T)+R                    #covariance
             K = np.dot(np.dot(PP,H.T),np.linalg.inv(S))       #kalman gain     
             #update  state & covariance
             blobs[i].x = (blobs[i].xp+np.dot(K,Y)).T
-            #x[vid_idx,:] = (xp+np.dot(K,Y)).T
             blobs[i].P = np.dot((I-np.dot(K,H)),PP)
         else: # if measument  can not obtain
             blobs[i].x = blobs[i].xp.T
-    
         #update velocity & accelation 
         if vid_idx>0:
             try :                                 
-                blobs[i].x[0][2] = blobs[i].x_old[0][2]
-                blobs[i].x[0][3] = blobs[i].x_old[0][3]
-                blobs[i].u = asarray([[blobs[i].x_old[0][2]-blobs[i].x_old2[0][2],\
-                                       blobs[i].x_old[0][3]-blobs[i].x_old2[0][3],\
-                                       blobs[i].x_old[0][2]-blobs[i].x_old2[0][2],\
-                                       blobs[i].x_old[0][3]-blobs[i].x_old2[0][3]]]).T
+                blobs[i].x[0][2] = blobs[i].x[0][0]-blobs[i].x_old[0][0]
+                blobs[i].x[0][3] = blobs[i].x[0][1]-blobs[i].x_old[0][1]
+                blobs[i].u = asarray([[blobs[i].x[0][2]-blobs[i].x_old[0][2],\
+                                       blobs[i].x[0][3]-blobs[i].x_old[0][3],\
+                                       blobs[i].x[0][2]-blobs[i].x_old[0][2],\
+                                       blobs[i].x[0][3]-blobs[i].x_old[0][3]]]).T
             except:
                 blobs[i].x[0][2] = blobs[i].x[0][0]
                 blobs[i].x[0][3] = blobs[i].x[0][1]
@@ -297,33 +262,26 @@ def Kalman_update(ori,length,frame,flag):
                                        blobs[i].x[0][3],\
                                        blobs[i].x[0][2],\
                                        blobs[i].x[0][3]]]).T
- 
-        blobs[i].x_old2=blobs[i].x_old
         blobs[i].x_old=blobs[i].x   
-        
-        print("obj {0}".format(int(i)))
-        print("ref  \n {0}".format(blobs[i].ref))
-        print("x is \n {0}".format(blobs[i].x))
-        print("xp is\n {0}".format(blobs[i].xp.T))
-        #print(blobs[i].u)
-        
-
-        
 
     left.set_data(frame[:,:,::-1])
     plt.draw()       
-    #kfinit = 1
- 
+    
+    if (len(lines) & kill_Trj) :
+        for _ in range(len(blob_idx)):
+            try: 
+                axL.lines.pop(0)
+                plt.show()
+            except:
+                print('I m here')  
+
     if imsave:
         imc = Image.fromarray(frame[:,:,::-1].astype(np.uint8))
         imc.save('/home/andyc/image/tra/2 balls/result/c%.3d.jpg'%vid_idx)
 
-
-
 def Objmatch(objy,objx,ref,L,W):
 
     cmtx = np.zeros((L,W))
-    #pdb.set_trace()                                                                                                                       
     for i in range(L):
         cmtx[i,:] =((objy - ref[i][0])**2+(objx - ref[i][1])**2).T
     if vid_idx == 74:
@@ -331,7 +289,6 @@ def Objmatch(objy,objx,ref,L,W):
     m = Munkres()
     indexes = m.compute(cmtx)
     return indexes
-
 
 
 try:
@@ -360,15 +317,16 @@ sig2     = np.zeros(vid[0].shape,dtype=float)
 sig2_old = np.zeros(vid[0].shape,dtype=float)
 
 plt.figure(1,figsize=[20,10])
-plt.subplot(121)
+axL = plt.subplot(121)
 left = plt.imshow(vid[0][:,:,::-1])
-plt.subplot(122)
+axis('off')
+axR = plt.subplot(122)
 right = plt.imshow(mu,clim=[0,1],cmap = 'gist_gray',interpolation='nearest')
+axis('off')
 
 
 for frame in vid:
     print("frame no : {0}".format(vid_idx))
-    #frame = frame[:,:,::-1]
     Fg = Fg_Extract(frame,2)
     idx,lab_mtx,coor,cnt = Objextract(Fg)
     Coor_Extract(idx,lab_mtx,frame,coor)
