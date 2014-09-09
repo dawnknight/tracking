@@ -27,7 +27,7 @@ flag = 1
 I = np.eye(4)
 
 imsave = 0
-kill_Trj = 0
+kill_Trj = 1
 
 blobs = {}
 obj_idx = 0
@@ -35,10 +35,10 @@ live_blobs = []
 
 class Blob(): #create a new blob                                                                                                          
 
-    def __init__(self,fshape):
+    def __init__(self,fshape,ini_x,ini_y):
         self.x = []                #current status
         self.x_old  = []           #previous  status
-        self.xp = np.array([[randint(0,fshape[0]),randint(0,fshape[1]),0,0]]).T
+        self.xp = np.array([[ini_y,ini_x,0,0]]).T
         self.u  = array([[0,0,0,0]]).T
         self.P = 100*np.eye(4)
         self.Trj = {}
@@ -135,8 +135,8 @@ def Coor_Extract(idx,lab_mtx,frame,coor):
     left.set_data(frame[:,:,::-1])
     plt.draw()
   
-    print(' idx number is {0} \n blobs number is {1}'.format(len(idx),len(blobs)))
-    print(' There are {0} live blobs\n\n'.format(len(live_blobs) ))
+    print('  measurment number is {0} \n  There are {1} blobs'.format(len(idx),len(blobs)))
+    print('  {0} of them are alive\n\n'.format(len(live_blobs) ))
     if (len(idx)>0 or len(blobs)>0):
         Kalman_update(ori,length,frame,flag)
     
@@ -157,45 +157,75 @@ def Kalman_update(ori,length,frame,flag):
     ycor = []              
     blob_idx = [] 
     lines ={}
+    NB_idx =[]
+    ini_x = []
+    ini_y = [] 
+ 
+    #if vid_idx > 182:
+    #    pdb.set_trace()
 
-    for i in range(len(ori)-len(live_blobs)):           #if new objs come in  
-        blobs[obj_idx] = Blob(frame.shape)              #initialize new blob                                                             
-        live_blobs.append(obj_idx)
-        obj_idx += 1   
-
-    for i in range(len(blobs)): 
-        if blobs[i].dtime <5: 
-            if blobs[i].status ==0: 
+    #for i in range(len(blobs)):
+    for _,i in enumerate(live_blobs):
+        if blobs[i].dtime <5:
+            if blobs[i].status ==0:
                 blobs[i].status = 1
             else:
-                blobs[i].xp = np.dot(A,blobs[i].x_old.T)+np.dot(B,blobs[i].u)         
+                blobs[i].xp = np.dot(A,blobs[i].x_old.T)+np.dot(B,blobs[i].u)
             xcor.append(blobs[i].xp[1])
             ycor.append(blobs[i].xp[0])
             blob_idx.append(i)
         else:
-            blobs[i].status = 2  
+            blobs[i].status = 2
             live_blobs = list(set(live_blobs).difference([i]))
-    if len(ori)>1: 
+
+    if (len(ori)>1 or (len(ori) ==1 & len(live_blobs)>1)) :
         order = Objmatch(ycor,xcor,ori,len(ori),len(blob_idx))
+        if len(ori)>len(live_blobs):                                                 # new blobs come in
+            NB_idx = list(set(range(len(ori))).difference([aa[0] for aa in order]))  # new blobs ori idx
+            ini_y = [ori[i][0] for i in NB_idx]
+            ini_x = [ori[i][1] for i in NB_idx] 
+
     elif len(ori) ==1: 
         order = [(0,0)]
+        if len(ori)>len(live_blobs): # new blobs come in
+            ini_y = [ori[0][0]]
+            ini_x = [ori[0][1]]
+
+    if vid_idx > 181:
+        pdb.set_trace()
+
+    for i in range(len(ori)-len(live_blobs)):           #if new objs come in  
+
+        blobs[obj_idx] = Blob(frame.shape,ini_x[i],ini_y[i])              #initialize new blob             
+        if len(NB_idx):                  
+            order.append((NB_idx[i],len(live_blobs)))
+        live_blobs.append(obj_idx)
+        blob_idx.append(obj_idx)
+        obj_idx += 1   
+
     if (len(ori)<len(blob_idx)) & (len(ori)!=0):
-        blob_idx = list(set([a[1] for a in order]) & set(blob_idx))      #find common term between 2 lists 
+        #blob_idx = list(set([a[1] for a in order]) & set(blob_idx))      #find common term between 2 lists
+        #o_idx = [a[1] for a in order]
+         
+        blob_idx = [blob_idx[i] for i in [a[1] for a in order] ]          #find the remaining blobs between 2 lists
+        
 
     #for i,j in zip(blob_idx,range(len(blob_idx))):
-    for j,i in enumerate(blob_idx):
+    #for jj,i in enumerate(blob_idx):
+    for jj,i in enumerate(live_blobs):
+        for blobs[i].dtime<5:
         if len(ori)!=0:
-            if vid_idx == 187:
-                pdb.set_trace()
-            ori[order[j][1]][2:] = array([ori[order[j][1]][0:2]])-blobs[i].ref[0][0:2]  #measure the velocity
+            #if vid_idx == 68:
+            #    pdb.set_trace()
+            ori[order[jj][1]][2:] = array([ori[order[jj][1]][0:2]])-blobs[i].ref[0][0:2]  #measure the velocity
 
             if len(ori) == len(blob_idx):
-                blobs[i].ref = array([ori[order[j][1]]])
-                blobs[i].len = length[order[j][1]]
+                blobs[i].ref = array([ori[order[jj][1]]])
+                blobs[i].len = length[order[jj][1]]
             elif len(ori) < len(blob_idx) :          #objs outside the view 
                 if i in array(order)[:,1]:
-                    blobs[i].ref = array([ori[order[j][1]]])   
-                    blobs[i].len = length[order[j][1]]   
+                    blobs[i].ref = array([ori[order[jj][1]]])   
+                    blobs[i].len = length[order[jj][1]]   
                 else:
                     blobs[i].dtime += 1  
 
@@ -234,7 +264,7 @@ def Kalman_update(ori,length,frame,flag):
         # Draw Trj
         if (len(blobs[i].Trj)>4 & blobs[i].dtime<5):
             plt.subplot(121)
-            lines = axL.plot(blobs[i].Trj['x'][4:],blobs[i].Trj['y'][4:],color = array(blobs[i].Color())/255.)
+            lines = axL.plot(blobs[i].Trj['x'][4:],blobs[i].Trj['y'][4:],color = array(blobs[i].Color())[::-1]/255.)
             
         if flag ==1:        
             PP = np.dot(np.dot(A,blobs[i].P),A.T)+Q                    #covariance  
@@ -284,11 +314,15 @@ def Objmatch(objy,objx,ref,L,W):
     cmtx = np.zeros((L,W))
     for i in range(L):
         cmtx[i,:] =((objy - ref[i][0])**2+(objx - ref[i][1])**2).T
-    if vid_idx == 74:
-        pdb.set_trace()
     m = Munkres()
-    indexes = m.compute(cmtx)
-    return indexes
+    if L<=W:
+        indexes = m.compute(cmtx)
+        #Spe     = 0
+    else:     # len(ori) > # live_blobs
+        indexes = m.compute(cmtx.T)
+        indexes = [(s[1],s[0]) for s in indexes]
+        #Spe     = 1 
+    return indexes  #Spe
 
 
 try:
