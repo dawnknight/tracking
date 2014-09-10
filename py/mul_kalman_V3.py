@@ -152,6 +152,7 @@ def Kalman_update(ori,length,frame,flag):
     global blobs
     global obj_idx
     global live_blobs
+    global order
 
     xcor = []
     ycor = []              
@@ -160,9 +161,7 @@ def Kalman_update(ori,length,frame,flag):
     NB_idx =[]
     ini_x = []
     ini_y = [] 
- 
-    #if vid_idx > 182:
-    #    pdb.set_trace()
+    order = []
 
     #for i in range(len(blobs)):
     for _,i in enumerate(live_blobs):
@@ -178,8 +177,11 @@ def Kalman_update(ori,length,frame,flag):
             blobs[i].status = 2
             live_blobs = list(set(live_blobs).difference([i]))
 
-    if (len(ori)>1 or (len(ori) ==1 & len(live_blobs)>1)) :
-        order = Objmatch(ycor,xcor,ori,len(ori),len(blob_idx))
+    #if vid_idx ==191:
+    #    pdb.set_trace()
+
+    if (len(ori)>1 or ((len(ori) ==1) & (len(live_blobs)>1))) :
+        order = Objmatch(ycor,xcor,ori,len(ori),len(blob_idx))    # order = [(A1,B1),....,(An,Bn)] An : idx of ori,Bn : idx of blob_idx 
         if len(ori)>len(live_blobs):                                                 # new blobs come in
             NB_idx = list(set(range(len(ori))).difference([aa[0] for aa in order]))  # new blobs ori idx
             ini_y = [ori[i][0] for i in NB_idx]
@@ -191,8 +193,6 @@ def Kalman_update(ori,length,frame,flag):
             ini_y = [ori[0][0]]
             ini_x = [ori[0][1]]
 
-    if vid_idx > 181:
-        pdb.set_trace()
 
     for i in range(len(ori)-len(live_blobs)):           #if new objs come in  
 
@@ -208,91 +208,107 @@ def Kalman_update(ori,length,frame,flag):
         #o_idx = [a[1] for a in order]
          
         blob_idx = [blob_idx[i] for i in [a[1] for a in order] ]          #find the remaining blobs between 2 lists
-        
 
-    #for i,j in zip(blob_idx,range(len(blob_idx))):
+    #if vid_idx == 191:
+    #    pdb.set_trace()
+    
     #for jj,i in enumerate(blob_idx):
-    for jj,i in enumerate(live_blobs):
-        for blobs[i].dtime<5:
-        if len(ori)!=0:
-            #if vid_idx == 68:
-            #    pdb.set_trace()
-            ori[order[jj][1]][2:] = array([ori[order[jj][1]][0:2]])-blobs[i].ref[0][0:2]  #measure the velocity
+    oidx = [k[1] for k in order]
 
-            if len(ori) == len(blob_idx):
-                blobs[i].ref = array([ori[order[jj][1]]])
-                blobs[i].len = length[order[jj][1]]
-            elif len(ori) < len(blob_idx) :          #objs outside the view 
-                if i in array(order)[:,1]:
-                    blobs[i].ref = array([ori[order[jj][1]]])   
-                    blobs[i].len = length[order[jj][1]]   
+    for _,i in enumerate(live_blobs):  
+      
+        if blobs[i].dtime<5:
+            if len(ori)!=0:
+                         
+                if i in blob_idx:
+                    jj = oidx.index(live_blobs.index(i))                                          
+                    ori[order[jj][0]][2:] = array([ori[order[jj][0]][0:2]])-blobs[i].ref[0][0:2]  #measure the velocity
+                    #if len(ori) == len(blob_idx): 
+                    blobs[i].ref = array([ori[order[jj][0]]])
+                    blobs[i].len = length[order[jj][0]]
+                    #blobs[i].dtime = max(0,blobs[i].dtime - 1)
                 else:
-                    blobs[i].dtime += 1  
+                    blobs[i].ref = blobs[i].x            # objs which are temporally hided
+                    blobs[i].dtime += 1
+                '''  
+                if len(ori) == len(blob_idx):
+                    blobs[i].ref = array([ori[order[jj][1]]])
+                    blobs[i].len = length[order[jj][1]]
+                elif len(ori) < len(blob_idx) :          #objs outside the view 
+                    if i in array(order)[:,1]:
+                        blobs[i].ref = array([ori[order[jj][1]]])   
+                        blobs[i].len = length[order[jj][1]]   
+                    else:
+                        blobs[i].dtime += 1
+                '''   
+            else:
+                blobs[i].dtime += 1
+  
 
-        ulx = int(round(blobs[i].xp[1]))
-        lrx = int(round(blobs[i].xp[1]+blobs[i].len[1]))
-        uly = int(round(blobs[i].xp[0]))
-        lry = int(round(blobs[i].xp[0]+blobs[i].len[0]))
-        # draw predict
-        if ((lrx>=0) & (lry>=0) & (ulx<frame.shape[1]) & (uly<frame.shape[0])): #at least part of the obj inside the view 
-            cv2.rectangle(frame,(max(ulx,0) ,max(uly,0)),\
-                                (min(lrx,frame.shape[1]),min(lry,frame.shape[0])),\
-                                 blobs[i].Color(),1)
+            ulx = int(round(blobs[i].xp[1]))
+            lrx = int(round(blobs[i].xp[1]+blobs[i].len[1]))
+            uly = int(round(blobs[i].xp[0]))
+            lry = int(round(blobs[i].xp[0]+blobs[i].len[0]))
+            # draw predict
+            if ((lrx>=0) & (lry>=0) & (ulx<frame.shape[1]) & (uly<frame.shape[0])): #at least part of the obj inside the view 
+                cv2.rectangle(frame,(max(ulx,0) ,max(uly,0)),\
+                                    (min(lrx,frame.shape[1]),min(lry,frame.shape[0])),\
+                                     blobs[i].Color(),1)
 
-            blobs[i].ivalue.append(frame[max(uly,0):min(lry,frame.shape[0]),\
-                                         max(ulx,0):min(lrx,frame.shape[1]),:].flatten().mean())  #avarge itensity value in Bbox   
+                blobs[i].ivalue.append(frame[max(uly,0):min(lry,frame.shape[0]),\
+                                             max(ulx,0):min(lrx,frame.shape[1]),:].flatten().mean())  #avarge itensity value in Bbox   
               
-            try:
-               trj_tmpx = blobs[i].Trj['x']
-               trj_tmpy = blobs[i].Trj['y']
-               trj_tmpy.append( [ int(min(max(round((uly+lry)/2),0),frame.shape[0]))])
-               trj_tmpx.append( [ int(min(max(round((ulx+lrx)/2),0),frame.shape[1]))])
-            except: 
-                trj_tmpy = [[int(min(max(round((uly+lry)/2),0),frame.shape[0]))]]
-                trj_tmpx = [[int(min(max(round((ulx+lrx)/2),0),frame.shape[1]))]]
-            blobs[i].Trj['x'] = trj_tmpx
-            blobs[i].Trj['y'] = trj_tmpy
+                try:
+                    trj_tmpx = blobs[i].Trj['x']
+                    trj_tmpy = blobs[i].Trj['y']
+                    trj_tmpy.append( [ int(min(max(round((uly+lry)/2),0),frame.shape[0]))])
+                    trj_tmpx.append( [ int(min(max(round((ulx+lrx)/2),0),frame.shape[1]))])
+                except: 
+                    trj_tmpy = [[int(min(max(round((uly+lry)/2),0),frame.shape[0]))]]
+                    trj_tmpx = [[int(min(max(round((ulx+lrx)/2),0),frame.shape[1]))]]
+                    blobs[i].Trj['x'] = trj_tmpx
+                    blobs[i].Trj['y'] = trj_tmpy
 
-        else:      #obj outside the view
-            trj_tmpx = blobs[i].Trj['x']
-            trj_tmpy = blobs[i].Trj['y']
-            trj_tmpx.append(trj_tmpx[-1])
-            trj_tmpy.append(trj_tmpy[-1])
-            blobs[i].Trj['x'] = trj_tmpx
-            blobs[i].Trj['y'] = trj_tmpy
-            blobs[i].dtime +=1 
-        # Draw Trj
-        if (len(blobs[i].Trj)>4 & blobs[i].dtime<5):
-            plt.subplot(121)
-            lines = axL.plot(blobs[i].Trj['x'][4:],blobs[i].Trj['y'][4:],color = array(blobs[i].Color())[::-1]/255.)
+            else:      #obj outside the view
+                trj_tmpx = blobs[i].Trj['x']
+                trj_tmpy = blobs[i].Trj['y']
+                trj_tmpx.append(trj_tmpx[-1])
+                trj_tmpy.append(trj_tmpy[-1])
+                blobs[i].Trj['x'] = trj_tmpx
+                blobs[i].Trj['y'] = trj_tmpy
+                blobs[i].dtime +=1 
+            # Draw Trj
+            if (len(blobs[i].Trj)>4 & blobs[i].dtime<5):
+                plt.subplot(121)
+                lines = axL.plot(blobs[i].Trj['x'][4:],blobs[i].Trj['y'][4:],color = array(blobs[i].Color())[::-1]/255.)
             
-        if flag ==1:        
-            PP = np.dot(np.dot(A,blobs[i].P),A.T)+Q                    #covariance  
-            Y = blobs[i].ref.T-np.dot(H,blobs[i].xp)                            #residual 
-            S = np.dot(np.dot(H,PP),H.T)+R                    #covariance
-            K = np.dot(np.dot(PP,H.T),np.linalg.inv(S))       #kalman gain     
-            #update  state & covariance
-            blobs[i].x = (blobs[i].xp+np.dot(K,Y)).T
-            blobs[i].P = np.dot((I-np.dot(K,H)),PP)
-        else: # if measument  can not obtain
-            blobs[i].x = blobs[i].xp.T
-        #update velocity & accelation 
-        if vid_idx>0:
-            try :                                 
-                blobs[i].x[0][2] = blobs[i].x[0][0]-blobs[i].x_old[0][0]
-                blobs[i].x[0][3] = blobs[i].x[0][1]-blobs[i].x_old[0][1]
-                blobs[i].u = asarray([[blobs[i].x[0][2]-blobs[i].x_old[0][2],\
-                                       blobs[i].x[0][3]-blobs[i].x_old[0][3],\
-                                       blobs[i].x[0][2]-blobs[i].x_old[0][2],\
-                                       blobs[i].x[0][3]-blobs[i].x_old[0][3]]]).T
-            except:
-                blobs[i].x[0][2] = blobs[i].x[0][0]
-                blobs[i].x[0][3] = blobs[i].x[0][1]
-                blobs[i].u = asarray([[blobs[i].x[0][2],\
-                                       blobs[i].x[0][3],\
-                                       blobs[i].x[0][2],\
-                                       blobs[i].x[0][3]]]).T
-        blobs[i].x_old=blobs[i].x   
+            if flag ==1:        
+                PP = np.dot(np.dot(A,blobs[i].P),A.T)+Q                    #covariance  
+                Y = blobs[i].ref.T-np.dot(H,blobs[i].xp)                            #residual 
+                S = np.dot(np.dot(H,PP),H.T)+R                    #covariance
+                K = np.dot(np.dot(PP,H.T),np.linalg.inv(S))       #kalman gain     
+                #update  state & covariance
+                blobs[i].x = (blobs[i].xp+np.dot(K,Y)).T
+                blobs[i].P = np.dot((I-np.dot(K,H)),PP)
+            else: # if measument  can not obtain
+                blobs[i].x = blobs[i].xp.T
+            #update velocity & accelation 
+            if vid_idx>0:
+                try :                                 
+                    blobs[i].x[0][2] = blobs[i].x[0][0]-blobs[i].x_old[0][0]
+                    blobs[i].x[0][3] = blobs[i].x[0][1]-blobs[i].x_old[0][1]
+                    blobs[i].u = asarray([[blobs[i].x[0][2]-blobs[i].x_old[0][2],\
+                                           blobs[i].x[0][3]-blobs[i].x_old[0][3],\
+                                           blobs[i].x[0][2]-blobs[i].x_old[0][2],\
+                                           blobs[i].x[0][3]-blobs[i].x_old[0][3]]]).T
+                except:
+                    blobs[i].x[0][2] = blobs[i].x[0][0]
+                    blobs[i].x[0][3] = blobs[i].x[0][1]
+                    blobs[i].u = asarray([[blobs[i].x[0][2],\
+                                           blobs[i].x[0][3],\
+                                           blobs[i].x[0][2],\
+                                           blobs[i].x[0][3]]]).T
+            blobs[i].x_old=blobs[i].x   
 
     left.set_data(frame[:,:,::-1])
     plt.draw()       
