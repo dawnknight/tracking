@@ -94,7 +94,7 @@ def Objextract(Fg):
     if num_features == 0:
        idx = []
     else:    
-        lth = 150   # label pixel number less than lth will be removed
+        lth = 120   # label pixel number less than lth will be removed
         Lth = 6500
         for i in range(1,num_features+1):
             coor.append(np.where(labeled_array==i))
@@ -163,7 +163,6 @@ def Kalman_update(ori,length,frame,flag):
     ini_y = [] 
     order = []
 
-    #for i in range(len(blobs)):
     for _,i in enumerate(live_blobs):
         if blobs[i].dtime <5:
             if blobs[i].status ==0:
@@ -177,10 +176,7 @@ def Kalman_update(ori,length,frame,flag):
             blobs[i].status = 2
             live_blobs = list(set(live_blobs).difference([i]))
 
-    #if vid_idx ==191:
-    #    pdb.set_trace()
-
-    if (len(ori)>1 or ((len(ori) ==1) & (len(live_blobs)>1))) :
+    if (len(ori)>1 or ((len(ori) ==1) & (len(live_blobs)>1))):
         order = Objmatch(ycor,xcor,ori,len(ori),len(blob_idx))    # order = [(A1,B1),....,(An,Bn)] An : idx of ori,Bn : idx of blob_idx 
         if len(ori)>len(live_blobs):                                                 # new blobs come in
             NB_idx = list(set(range(len(ori))).difference([aa[0] for aa in order]))  # new blobs ori idx
@@ -193,9 +189,7 @@ def Kalman_update(ori,length,frame,flag):
             ini_y = [ori[0][0]]
             ini_x = [ori[0][1]]
 
-
     for i in range(len(ori)-len(live_blobs)):           #if new objs come in  
-
         blobs[obj_idx] = Blob(frame.shape,ini_x[i],ini_y[i])              #initialize new blob             
         if len(NB_idx):                  
             order.append((NB_idx[i],len(live_blobs)))
@@ -204,19 +198,11 @@ def Kalman_update(ori,length,frame,flag):
         obj_idx += 1   
 
     if (len(ori)<len(blob_idx)) & (len(ori)!=0):
-        #blob_idx = list(set([a[1] for a in order]) & set(blob_idx))      #find common term between 2 lists
         #o_idx = [a[1] for a in order]
-         
         blob_idx = [blob_idx[i] for i in [a[1] for a in order] ]          #find the remaining blobs between 2 lists
 
-    #if vid_idx == 191:
-    #    pdb.set_trace()
-    
-    #for jj,i in enumerate(blob_idx):
     oidx = [k[1] for k in order]
-
     for _,i in enumerate(live_blobs):  
-      
         if blobs[i].dtime<5:
             if len(ori)!=0:
                          
@@ -230,20 +216,8 @@ def Kalman_update(ori,length,frame,flag):
                 else:
                     blobs[i].ref = blobs[i].x            # objs which are temporally hided
                     blobs[i].dtime += 1
-                '''  
-                if len(ori) == len(blob_idx):
-                    blobs[i].ref = array([ori[order[jj][1]]])
-                    blobs[i].len = length[order[jj][1]]
-                elif len(ori) < len(blob_idx) :          #objs outside the view 
-                    if i in array(order)[:,1]:
-                        blobs[i].ref = array([ori[order[jj][1]]])   
-                        blobs[i].len = length[order[jj][1]]   
-                    else:
-                        blobs[i].dtime += 1
-                '''   
             else:
                 blobs[i].dtime += 1
-  
 
             ulx = int(round(blobs[i].xp[1]))
             lrx = int(round(blobs[i].xp[1]+blobs[i].len[1]))
@@ -254,10 +228,8 @@ def Kalman_update(ori,length,frame,flag):
                 cv2.rectangle(frame,(max(ulx,0) ,max(uly,0)),\
                                     (min(lrx,frame.shape[1]),min(lry,frame.shape[0])),\
                                      blobs[i].Color(),1)
-
                 blobs[i].ivalue.append(frame[max(uly,0):min(lry,frame.shape[0]),\
                                              max(ulx,0):min(lrx,frame.shape[1]),:].flatten().mean())  #avarge itensity value in Bbox   
-              
                 try:
                     trj_tmpx = blobs[i].Trj['x']
                     trj_tmpy = blobs[i].Trj['y']
@@ -268,7 +240,6 @@ def Kalman_update(ori,length,frame,flag):
                     trj_tmpx = [[int(min(max(round((ulx+lrx)/2),0),frame.shape[1]))]]
                     blobs[i].Trj['x'] = trj_tmpx
                     blobs[i].Trj['y'] = trj_tmpy
-
             else:      #obj outside the view
                 trj_tmpx = blobs[i].Trj['x']
                 trj_tmpy = blobs[i].Trj['y']
@@ -280,8 +251,7 @@ def Kalman_update(ori,length,frame,flag):
             # Draw Trj
             if (len(blobs[i].Trj)>4 & blobs[i].dtime<5):
                 plt.subplot(121)
-                lines = axL.plot(blobs[i].Trj['x'][4:],blobs[i].Trj['y'][4:],color = array(blobs[i].Color())[::-1]/255.)
-            
+                lines = axL.plot(blobs[i].Trj['x'][4:],blobs[i].Trj['y'][4:],color = array(blobs[i].Color())[::-1]/255.,linewidth=2)
             if flag ==1:        
                 PP = np.dot(np.dot(A,blobs[i].P),A.T)+Q                    #covariance  
                 Y = blobs[i].ref.T-np.dot(H,blobs[i].xp)                            #residual 
@@ -309,10 +279,9 @@ def Kalman_update(ori,length,frame,flag):
                                            blobs[i].x[0][2],\
                                            blobs[i].x[0][3]]]).T
             blobs[i].x_old=blobs[i].x   
-
     left.set_data(frame[:,:,::-1])
     plt.draw()       
-    
+    # erase the Trj    
     if (len(lines) & kill_Trj) :
         for _ in range(len(blob_idx)):
             try: 
@@ -320,26 +289,21 @@ def Kalman_update(ori,length,frame,flag):
                 plt.show()
             except:
                 print('I m here')  
-
     if imsave:
         imc = Image.fromarray(frame[:,:,::-1].astype(np.uint8))
         imc.save('/home/andyc/image/tra/2 balls/result/c%.3d.jpg'%vid_idx)
 
 def Objmatch(objy,objx,ref,L,W):
-
     cmtx = np.zeros((L,W))
     for i in range(L):
         cmtx[i,:] =((objy - ref[i][0])**2+(objx - ref[i][1])**2).T
     m = Munkres()
     if L<=W:
         indexes = m.compute(cmtx)
-        #Spe     = 0
     else:     # len(ori) > # live_blobs
         indexes = m.compute(cmtx.T)
         indexes = [(s[1],s[0]) for s in indexes]
-        #Spe     = 1 
-    return indexes  #Spe
-
+    return indexes  
 
 try:
     vid
@@ -360,7 +324,6 @@ except:
 
     print('done reading video...')
 
-
 mu       = np.zeros(vid[0].shape,dtype=float)
 mu_old   = np.zeros(vid[0].shape,dtype=float)
 sig2     = np.zeros(vid[0].shape,dtype=float)
@@ -373,7 +336,6 @@ axis('off')
 axR = plt.subplot(122)
 right = plt.imshow(mu,clim=[0,1],cmap = 'gist_gray',interpolation='nearest')
 axis('off')
-
 
 for frame in vid:
     print("frame no : {0}".format(vid_idx))
