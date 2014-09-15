@@ -27,7 +27,11 @@ flag = 1
 I = np.eye(4)
 
 imsave = 0
-kill_Trj = 1
+draw_Trj = 1
+kill_Trj = 0
+
+scale = 0.2
+maskon = 1
 
 blobs = {}
 obj_idx = 0
@@ -74,10 +78,14 @@ def Fg_Extract(frame,type = 1): #extract foreground
         try:
             fg = np.abs(1.0*frame.mean(2)-BG)>50.0
         except:
-            BG = pickle.load(open("bg13-19.pkl","rb"))
-            BG = cv2.resize(BG,(0,0),fx = 0.5,fy=0.5)
+            BG = pickle.load(open("jstr.pkl","rb"))
+            BG = cv2.resize(BG,(0,0),fx = scale,fy=scale)
             fg = np.abs(1.0*frame.mean(2)-BG)>50.0
-            
+    if maskon:
+       mask = pickle.load(open("jstr_mask.pkl","rb"))     
+       mask = cv2.resize(mask,(0,0),fx = scale,fy=scale)
+       fg = fg*mask
+
     fgo = ndm.binary_opening(fg)
     fgf = ndm.binary_fill_holes(fgo)
     right.set_data(fgf)
@@ -163,6 +171,8 @@ def Kalman_update(ori,length,frame,flag):
     ini_y = [] 
     order = []
 
+    #pdb.set_trace()
+
     for _,i in enumerate(live_blobs):
         if blobs[i].dtime <5:
             if blobs[i].status ==0:
@@ -176,6 +186,7 @@ def Kalman_update(ori,length,frame,flag):
             blobs[i].status = 2
             live_blobs = list(set(live_blobs).difference([i]))
 
+    '''
     if (len(ori)>1 or ((len(ori) ==1) & (len(live_blobs)>1))):
         order = Objmatch(ycor,xcor,ori,len(ori),len(blob_idx))    # order = [(A1,B1),....,(An,Bn)] An : idx of ori,Bn : idx of blob_idx 
         if len(ori)>len(live_blobs):                                                 # new blobs come in
@@ -188,6 +199,20 @@ def Kalman_update(ori,length,frame,flag):
         if len(ori)>len(live_blobs): # new blobs come in
             ini_y = [ori[0][0]]
             ini_x = [ori[0][1]]
+    '''
+    if (len(ori)!=0) & (len(live_blobs)!=0):                      
+        order = Objmatch(ycor,xcor,ori,len(ori),len(blob_idx))    # order = [(A1,B1),....,(An,Bn)] An : idx of ori,Bn : idx of blob_idx   
+        if len(ori)>len(live_blobs):                                                 # new blobs come in
+            NB_idx = list(set(range(len(ori))).difference([aa[0] for aa in order]))  # new blobs ori idx 
+            ini_y = [ori[i][0] for i in NB_idx]
+            ini_x = [ori[i][1] for i in NB_idx]
+    elif (len(ori)>0) & (len(live_blobs)==0):        # multiple new objs come in  
+          order = [(i,i) for i in range(len(ori))]
+          ini_y = [ori[i][0] for i in range(len(ori))]
+          ini_x = [ori[i][1] for i in range(len(ori))]
+    else:   # case 1 : (len(ori)==0) & (len(blob_idx)>0)              
+            # case 2 : (len(ori)==0) & (len(blob_idx)=0)
+          print("do nothing") 
 
     for i in range(len(ori)-len(live_blobs)):           #if new objs come in  
         blobs[obj_idx] = Blob(frame.shape,ini_x[i],ini_y[i])              #initialize new blob             
@@ -225,9 +250,9 @@ def Kalman_update(ori,length,frame,flag):
             lry = int(round(blobs[i].xp[0]+blobs[i].len[0]))
             # draw predict
             if ((lrx>=0) & (lry>=0) & (ulx<frame.shape[1]) & (uly<frame.shape[0])): #at least part of the obj inside the view 
-                cv2.rectangle(frame,(max(ulx,0) ,max(uly,0)),\
-                                    (min(lrx,frame.shape[1]),min(lry,frame.shape[0])),\
-                                     blobs[i].Color(),1)
+                #cv2.rectangle(frame,(max(ulx,0) ,max(uly,0)),\
+                #                    (min(lrx,frame.shape[1]),min(lry,frame.shape[0])),\
+                #                     blobs[i].Color(),1)
                 blobs[i].ivalue.append(frame[max(uly,0):min(lry,frame.shape[0]),\
                                              max(ulx,0):min(lrx,frame.shape[1]),:].flatten().mean())  #avarge itensity value in Bbox   
                 try:
@@ -249,9 +274,11 @@ def Kalman_update(ori,length,frame,flag):
                 blobs[i].Trj['y'] = trj_tmpy
                 blobs[i].dtime +=1 
             # Draw Trj
-            if (len(blobs[i].Trj)>4 & blobs[i].dtime<5):
-                plt.subplot(121)
-                lines = axL.plot(blobs[i].Trj['x'][4:],blobs[i].Trj['y'][4:],color = array(blobs[i].Color())[::-1]/255.,linewidth=2)
+            if draw_Trj :
+                if (len(blobs[i].Trj)>4 & blobs[i].dtime<5):
+                    plt.subplot(121)
+                    lines = axL.plot(blobs[i].Trj['x'][4:],blobs[i].Trj['y'][4:],color = array(blobs[i].Color())[::-1]/255.,linewidth=2)
+    
             if flag ==1:        
                 PP = np.dot(np.dot(A,blobs[i].P),A.T)+Q                    #covariance  
                 Y = blobs[i].ref.T-np.dot(H,blobs[i].xp)                            #residual 
@@ -281,14 +308,17 @@ def Kalman_update(ori,length,frame,flag):
             blobs[i].x_old=blobs[i].x   
     left.set_data(frame[:,:,::-1])
     plt.draw()       
+
     # erase the Trj    
-    if (len(lines) & kill_Trj) :
+    if (len(lines) & kill_Trj):
         for _ in range(len(blob_idx)):
             try: 
                 axL.lines.pop(0)
                 plt.show()
             except:
-                print('I m here')  
+                print('I m here')
+
+  
     if imsave:
         imc = Image.fromarray(frame[:,:,::-1].astype(np.uint8))
         imc.save('/home/andyc/image/tra/2 balls/result/c%.3d.jpg'%vid_idx)
@@ -309,7 +339,7 @@ try:
     vid
 except:
     print('reading video...')
-    cap = cv2.VideoCapture('/home/andyc/crowd2.avi')
+    cap = cv2.VideoCapture('/home/andyc/jaystr.avi')
     vid = []
 
     if cap.isOpened():
@@ -319,7 +349,7 @@ except:
     while rval:
         rval,frame = cap.read()
         if rval:
-            frame = cv2.resize(frame,(0,0),fx = 0.5,fy=0.5)
+            frame = cv2.resize(frame,(0,0),fx = scale,fy=scale)
             vid.append(frame)
 
     print('done reading video...')
@@ -337,7 +367,7 @@ axR = plt.subplot(122)
 right = plt.imshow(mu,clim=[0,1],cmap = 'gist_gray',interpolation='nearest')
 axis('off')
 
-for frame in vid:
+for frame in vid[::]:
     print("frame no : {0}".format(vid_idx))
     Fg = Fg_Extract(frame,2)
     idx,lab_mtx,coor,cnt = Objextract(Fg)
