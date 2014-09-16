@@ -30,8 +30,8 @@ imsave = 0
 draw_Trj = 1
 kill_Trj = 0
 
-scale = 0.2
-maskon = 1
+scale = 0.5
+maskon = 0
 
 blobs = {}
 obj_idx = 0
@@ -78,7 +78,7 @@ def Fg_Extract(frame,type = 1): #extract foreground
         try:
             fg = np.abs(1.0*frame.mean(2)-BG)>50.0
         except:
-            BG = pickle.load(open("jstr.pkl","rb"))
+            BG = pickle.load(open("crowd2.pkl","rb"))
             BG = cv2.resize(BG,(0,0),fx = scale,fy=scale)
             fg = np.abs(1.0*frame.mean(2)-BG)>50.0
     if maskon:
@@ -120,7 +120,7 @@ def Objextract(Fg):
 def Coor_Extract(idx,lab_mtx,frame,coor): 
     length = {}
     ori = {}
-
+    ori_color ={} 
     if len(idx)==0:        
         flag = 0
     else: 
@@ -137,6 +137,10 @@ def Coor_Extract(idx,lab_mtx,frame,coor):
 
             ori[i][0:2] = [uly,ulx]
             length[i]   = [lry-uly,lrx-ulx]     
+            
+            ori_color[i] = array([frame[uly:lry,ulx:lrx,0].flatten().mean(),\
+                                  frame[uly:lry,ulx:lrx,1].flatten().mean(),\
+                                  frame[uly:lry,ulx:lrx,2].flatten().mean()])
 
             cv2.rectangle(frame,(ulx,uly),(lrx,lry),(0,255,0),1)
 
@@ -146,9 +150,9 @@ def Coor_Extract(idx,lab_mtx,frame,coor):
     print('  measurment number is {0} \n  There are {1} blobs'.format(len(idx),len(blobs)))
     print('  {0} of them are alive\n\n'.format(len(live_blobs) ))
     if (len(idx)>0 or len(blobs)>0):
-        Kalman_update(ori,length,frame,flag)
+        Kalman_update(ori,ori_color,length,frame,flag)
     
-def Kalman_update(ori,length,frame,flag):
+def Kalman_update(ori,ori_color,length,frame,flag):
 
     global P
     global PP
@@ -181,25 +185,14 @@ def Kalman_update(ori,length,frame,flag):
                 blobs[i].xp = np.dot(A,blobs[i].x_old.T)+np.dot(B,blobs[i].u)
             xcor.append(blobs[i].xp[1])
             ycor.append(blobs[i].xp[0])
+            # add color info here 
+
             blob_idx.append(i)
         else:
             blobs[i].status = 2
-            live_blobs = list(set(live_blobs).difference([i]))
+            live_blobs = [a for a in live_blobs if a!=i]
 
-    '''
-    if (len(ori)>1 or ((len(ori) ==1) & (len(live_blobs)>1))):
-        order = Objmatch(ycor,xcor,ori,len(ori),len(blob_idx))    # order = [(A1,B1),....,(An,Bn)] An : idx of ori,Bn : idx of blob_idx 
-        if len(ori)>len(live_blobs):                                                 # new blobs come in
-            NB_idx = list(set(range(len(ori))).difference([aa[0] for aa in order]))  # new blobs ori idx
-            ini_y = [ori[i][0] for i in NB_idx]
-            ini_x = [ori[i][1] for i in NB_idx] 
 
-    elif len(ori) ==1: 
-        order = [(0,0)]
-        if len(ori)>len(live_blobs): # new blobs come in
-            ini_y = [ori[0][0]]
-            ini_x = [ori[0][1]]
-    '''
     if (len(ori)!=0) & (len(live_blobs)!=0):                      
         order = Objmatch(ycor,xcor,ori,len(ori),len(blob_idx))    # order = [(A1,B1),....,(An,Bn)] An : idx of ori,Bn : idx of blob_idx   
         if len(ori)>len(live_blobs):                                                 # new blobs come in
@@ -250,9 +243,9 @@ def Kalman_update(ori,length,frame,flag):
             lry = int(round(blobs[i].xp[0]+blobs[i].len[0]))
             # draw predict
             if ((lrx>=0) & (lry>=0) & (ulx<frame.shape[1]) & (uly<frame.shape[0])): #at least part of the obj inside the view 
-                #cv2.rectangle(frame,(max(ulx,0) ,max(uly,0)),\
-                #                    (min(lrx,frame.shape[1]),min(lry,frame.shape[0])),\
-                #                     blobs[i].Color(),1)
+                cv2.rectangle(frame,(max(ulx,0) ,max(uly,0)),\
+                                    (min(lrx,frame.shape[1]),min(lry,frame.shape[0])),\
+                                     blobs[i].Color(),1)
                 blobs[i].ivalue.append(frame[max(uly,0):min(lry,frame.shape[0]),\
                                              max(ulx,0):min(lrx,frame.shape[1]),:].flatten().mean())  #avarge itensity value in Bbox   
                 try:
@@ -339,7 +332,7 @@ try:
     vid
 except:
     print('reading video...')
-    cap = cv2.VideoCapture('/home/andyc/jaystr.avi')
+    cap = cv2.VideoCapture('/home/andyc/crowd2.avi')
     vid = []
 
     if cap.isOpened():
