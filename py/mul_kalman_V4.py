@@ -171,7 +171,8 @@ def Kalman_update(ori,ori_color,length,frame,flag):
     global obj_idx
     global live_blobs
     global order
-
+    
+     
     xcor = []
     ycor = []              
     blob_idx = [] 
@@ -179,7 +180,7 @@ def Kalman_update(ori,ori_color,length,frame,flag):
     NB_idx =[]
     ini_x = []
     ini_y = [] 
-    order = []
+    order = [] 
 
     for _,i in enumerate(live_blobs):
         if blobs[i].dtime <5:
@@ -261,13 +262,15 @@ def Kalman_update(ori,ori_color,length,frame,flag):
                         trj_tmpy.append( [ int(min(max(round(blobs[i].ref[0][0]+blobs[i].len[0]/2),0),frame.shape[0]))])
                         trj_tmpx.append( [ int(min(max(round(blobs[i].ref[0][1]+blobs[i].len[1]/2),0),frame.shape[1]))]) 
 
-                except: 
+                except:
+ 
                     if Trj_type== 1:
                         trj_tmpy = [[int(min(max(round((uly+lry)/2),0),frame.shape[0]))]]
                         trj_tmpx = [[int(min(max(round((ulx+lrx)/2),0),frame.shape[1]))]] 
                     else:
-                        trj_tmpy.append( [ int(min(max(round(blobs[i].ref[0][0]+blobs[i].len[0]/2),0),frame.shape[0]))])
-                        trj_tmpx.append( [ int(min(max(round(blobs[i].ref[0][1]+blobs[i].len[1]/2),0),frame.shape[1]))])   
+                        trj_tmpy = [[int(min(max(round(blobs[i].ref[0][0]+blobs[i].len[0]/2),0),frame.shape[0]))]]
+                        trj_tmpx = [[int(min(max(round(blobs[i].ref[0][1]+blobs[i].len[1]/2),0),frame.shape[1]))]]
+
                     blobs[i].Trj['x'] = trj_tmpx
                     blobs[i].Trj['y'] = trj_tmpy
             else:      #obj outside the view
