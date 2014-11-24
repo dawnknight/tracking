@@ -28,13 +28,13 @@ I = np.eye(4)
 
 imsave = 0
 draw_Trj = 1
-kill_Trj = 0
+kill_Trj = 1
 Trj_type = 0   # 0 : from measurment Bbox  # 1 :from prediction Bbox 
 
 
 
 scale = 0.5
-maskon = 0
+maskon = 1
 
 blobs = {}
 obj_idx = 0
@@ -58,6 +58,10 @@ class Blob(): #create a new blob
         self.status = 0                 # 0 : as initial  1 : as live  2 : as dead     
         self.dtime = 0                  # obj dispear period                                                                              
         self.ivalue = []                # store intensity value in Bbox
+
+        self.Trj['x'] = []
+        self.Trj['y'] = []
+        self.Trj['frame'] = []
 
     def Color(self):    #initial Blob color                                                                                               
         try:
@@ -84,7 +88,7 @@ def Fg_Extract(frame,type = 1): #extract foreground
         try:
             fg = np.abs(1.0*frame.mean(2)-BG)>50.0
         except:
-            BG = pickle.load(open("crowd2.pkl","rb"))
+            BG = pickle.load(open("jstr.pkl","rb"))
             BG = cv2.resize(BG,(0,0),fx = scale,fy=scale)
             fg = np.abs(1.0*frame.mean(2)-BG)>50.0
     if maskon:
@@ -181,6 +185,7 @@ def Kalman_update(ori,ori_color,length,frame,flag):
     ini_x = []
     ini_y = [] 
     order = [] 
+    line_exist = 0
 
     for _,i in enumerate(live_blobs):
         if blobs[i].dtime <5:
@@ -252,16 +257,16 @@ def Kalman_update(ori,ori_color,length,frame,flag):
                                      blobs[i].Color(),1)
                 blobs[i].ivalue.append(frame[max(uly,0):min(lry,frame.shape[0]),\
                                              max(ulx,0):min(lrx,frame.shape[1]),:].flatten().mean())  #avarge itensity value in Bbox   
-                try:
-                    trj_tmpx = blobs[i].Trj['x']
-                    trj_tmpy = blobs[i].Trj['y']
-                    if Trj_type == 1:  # from prediction 
-                        trj_tmpy.append( [ int(min(max(round((uly+lry)/2),0),frame.shape[0]))])
-                        trj_tmpx.append( [ int(min(max(round((ulx+lrx)/2),0),frame.shape[1]))])
-                    else:    #from measurment          
-                        trj_tmpy.append( [ int(min(max(round(blobs[i].ref[0][0]+blobs[i].len[0]/2),0),frame.shape[0]))])
-                        trj_tmpx.append( [ int(min(max(round(blobs[i].ref[0][1]+blobs[i].len[1]/2),0),frame.shape[1]))]) 
-
+                #try:
+                trj_tmpx = copy.deepcopy(blobs[i].Trj['x'])
+                trj_tmpy = copy.deepcopy(blobs[i].Trj['y'])
+                if Trj_type == 1:  # from prediction 
+                    trj_tmpy.append( [ int(min(max(round((uly+lry)/2),0),frame.shape[0]))])
+                    trj_tmpx.append( [ int(min(max(round((ulx+lrx)/2),0),frame.shape[1]))])
+                else:    #from measurment          
+                    trj_tmpy.append( [ int(min(max(round(blobs[i].ref[0][0]+blobs[i].len[0]/2),0),frame.shape[0]))])
+                    trj_tmpx.append( [ int(min(max(round(blobs[i].ref[0][1]+blobs[i].len[1]/2),0),frame.shape[1]))]) 
+                ''' 
                 except:
  
                     if Trj_type== 1:
@@ -270,23 +275,30 @@ def Kalman_update(ori,ori_color,length,frame,flag):
                     else:
                         trj_tmpy = [[int(min(max(round(blobs[i].ref[0][0]+blobs[i].len[0]/2),0),frame.shape[0]))]]
                         trj_tmpx = [[int(min(max(round(blobs[i].ref[0][1]+blobs[i].len[1]/2),0),frame.shape[1]))]]
-
-                    blobs[i].Trj['x'] = trj_tmpx
-                    blobs[i].Trj['y'] = trj_tmpy
+                ''' 
+                #blobs[i].Trj['x'] = trj_tmpx
+                #blobs[i].Trj['y'] = trj_tmpy
             else:      #obj outside the view
-                trj_tmpx = blobs[i].Trj['x']
-                trj_tmpy = blobs[i].Trj['y']
+                trj_tmpx = copy.deepcopy(blobs[i].Trj['x'])
+                trj_tmpy = copy.deepcopy(blobs[i].Trj['y'])
                 trj_tmpx.append(trj_tmpx[-1])
                 trj_tmpy.append(trj_tmpy[-1])
-                blobs[i].Trj['x'] = trj_tmpx
-                blobs[i].Trj['y'] = trj_tmpy
-                blobs[i].dtime +=1 
+                #blobs[i].Trj['x'] = trj_tmpx
+                #blobs[i].Trj['y'] = trj_tmpy
+                blobs[i].dtime +=1
+            blobs[i].Trj['x'] = trj_tmpx
+            blobs[i].Trj['y'] = trj_tmpy
+ 
+            f_no = copy.deepcopy(blobs[i].Trj['frame'])
+            f_no.append(vid_idx)
+            blobs[i].Trj['frame'] = f_no
+
             # Draw Trj
             if draw_Trj :
                 if (len(blobs[i].Trj)>4 & blobs[i].dtime<5):
                     plt.subplot(121)
                     lines = axL.plot(blobs[i].Trj['x'][4:],blobs[i].Trj['y'][4:],color = array(blobs[i].Color())[::-1]/255.,linewidth=2)
-    
+                line_exist = 1   
             if flag ==1:        
                 PP = np.dot(np.dot(A,blobs[i].P),A.T)+Q                    #covariance  
                 Y = blobs[i].ref.T-np.dot(H,blobs[i].xp)                            #residual 
@@ -318,13 +330,13 @@ def Kalman_update(ori,ori_color,length,frame,flag):
     plt.draw()       
 
     # erase the Trj    
-    if (len(lines) & kill_Trj):
-        for _ in range(len(blob_idx)):
-            try: 
-                axL.lines.pop(0)
-                plt.show()
-            except:
-                print('I m here')
+    while line_exist & kill_Trj:
+        try:
+            axL.lines.pop(0)
+            plt.show()
+        except:
+            line_exist = 0
+            #print('No Trj need to erase ~~~')
 
   
     if imsave:
@@ -334,7 +346,7 @@ def Kalman_update(ori,ori_color,length,frame,flag):
 def Objmatch(objy,objx,ref,refc,L,W,im,length):
     dmtx = np.zeros((L,W))
     cmtx = np.zeros((L,W))
-    Wd = 0.7   #weight of distance                                                                                                    
+    Wd = 0.5   #weight of distance                                                                                                    
     Wc = 1-Wd  #weight of color                                                                                                       
 
     for i in range(L):
@@ -364,7 +376,7 @@ try:
     vid
 except:
     print('reading video...')
-    cap = cv2.VideoCapture('/home/andyc/crowd2.avi')
+    cap = cv2.VideoCapture('/home/andyc/jaystr.avi')
     vid = []
 
     if cap.isOpened():
