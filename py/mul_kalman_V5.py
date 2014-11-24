@@ -43,7 +43,6 @@ blobs = {}
 obj_idx = 0
 live_blobs = []
 
-
 F_case = 0
 M_case = 0
 B_case = 0
@@ -62,21 +61,13 @@ Bs_lb = C_size/4.5          #low bound of blobs size
 Bs_factor = 6             #Bus size factor (area of common bus/area of common car)
 Bs_ub = Bs_lb*Bs_factor*2   #upper bound of blobs size 
 
-
-
-
-#mask = pickle.load(open("/home/andyc/tracking/py/mask/TLC0005_mask.pkl","rb"))
 mask = pickle.load(open("./mask/caraccident_mask.pkl","rb"))
 mask = cv2.resize(mask,(0,0),fx = scale,fy=scale)
 Rmask = mask==0  #inversed mask
 mask2 = pickle.load(open("./mask/caraccident_mask_1.pkl","rb"))
 mask2 = cv2.resize(mask2,(0,0),fx = scale,fy=scale)
 
-
-#AA = pickle.load(open("AA.pkl","rb"))
-
 class Blob(): #create a new blob                                                                                                          
-
     def __init__(self,fshape,ini_x,ini_y):
         self.x = []                #current status
         self.x_old  = []           #previous  status
@@ -95,7 +86,6 @@ class Blob(): #create a new blob
         self.Trj['x'] = []
         self.Trj['y'] = []
         self.Trj['frame'] = []
-
     def Color(self):    #initial Blob color                                                                                               
         try:
             self.R
@@ -121,14 +111,12 @@ def ShadowRm(fg,frame,bg,N,h,w,th):
                     NCC[ii,jj] = 1
     return NCC
 
-
 def Fg_Extract(frame,type = 1,trun = 100): #extract foreground    
     
     global BG_old
     global F_case
     global M_case
     global B_case
-
 
     if type ==1:    # training BG
         mu[:]       = alpha*frame + (1.0-alpha)*mu_old
@@ -139,7 +127,6 @@ def Fg_Extract(frame,type = 1,trun = 100): #extract foreground
         lmcs = lmc*sig
         bmcs = bmc*sig       
         sig_factor = 1
-        #pdb.set_trace() 
        
         fg= (np.abs(1.0*frame-mu)[:,:,0]-sig_factor*sig[:,:,0]>0.0) +\
             (np.abs(1.0*frame-mu)[:,:,1]-sig_factor*sig[:,:,1]>0.0) +\
@@ -152,6 +139,7 @@ def Fg_Extract(frame,type = 1,trun = 100): #extract foreground
             fg = (np.abs(1.0*frame[:,:,0]-BG[:,:,0])>50.)+\
                  (np.abs(1.0*frame[:,:,1]-BG[:,:,1])>50.)+\
                  (np.abs(1.0*frame[:,:,2]-BG[:,:,2])>50.)
+
     elif type == 2.5 : #avg total seq (need saved file) normalized image
 
         BG = pickle.load(open("./BG/car accident.pkl","rb"))
@@ -181,9 +169,6 @@ def Fg_Extract(frame,type = 1,trun = 100): #extract foreground
 
         dif = abs(fcal-BG)
         fg  = ((dif[:,:,1]>20.)|(dif[:,:,2]>30.)) 
-  
-
-
 
     elif type == 3 : #truncation mean 1. 
         if len(vid)>trun:
@@ -250,7 +235,6 @@ def Fg_Extract(frame,type = 1,trun = 100): #extract foreground
                  (np.abs(1.0*frame[:,:,1]-BG[:,:,1])>30.0)+\
                  (np.abs(1.0*frame[:,:,2]-BG[:,:,2])>30.0)
 
-
         else:
             print('select truncation is larger then the sequence....')
             BG = array(vid).mean(0)
@@ -283,7 +267,6 @@ def Fg_Extract(frame,type = 1,trun = 100): #extract foreground
                 else:
                     LB = vid_idx-int(trun/2)+1
                     UB = vid_idx+int(trun/2)
-                    #pdb.set_trace()                                                                                                                                                                                                                                                                                                                                                                               
                     BG = array(vid[LB:UB+1]).mean(0)
                     M_case = 1
 
@@ -301,23 +284,17 @@ def Fg_Extract(frame,type = 1,trun = 100): #extract foreground
         ind.pop(trun/2)
         buf[-1] = vid[vid_idx+N+1]  
         
-        #pdb.set_trace()
         if len(vid)>trun:
-
             BG = np.abs(buf[ind]-buf[trun/2]).mean(3).mean(0)
             fg = (BG>40.)*Tf                     
             buf=np.roll(buf,-1,0)
         else:
             print('select truncation is larger then the sequence....')
-        #pdb.set_trace()
-
     if maskon:
        fg = fg*mask*mask2
 
-
-    #fgo = ndm.binary_opening(fg,np.ones([5,5]))
-    fgo = ndm.binary_dilation(fg,np.ones([2,2]))
-    fgf = ndm.binary_fill_holes(fgo)
+    fgd = ndm.binary_dilation(fg,np.ones([2,2]))
+    fgf = ndm.binary_fill_holes(fgd)
     right.set_data(mf(fgf,5))
     plt.draw()
     if (type!=1)&(type!=5):
@@ -368,21 +345,17 @@ def Coor_Extract(idx,lab_mtx,frame,coor):
             #ori[i][0:2] = [uly,ulx]  
             ori[i][0:2] = [uly+int(length[i][0]/2),ulx+int(length[i][1]/2)]
 
-
             ori_color[i] = array([frame[uly:lry,ulx:lrx,0].flatten().mean(),\
                                   frame[uly:lry,ulx:lrx,1].flatten().mean(),\
                                   frame[uly:lry,ulx:lrx,2].flatten().mean()]) 
             
             cv2.rectangle(frame,(ulx,uly),(lrx,lry),(0,255,0),1)
-
     left.set_data(frame)
-   
     plt.draw()
   
     print('  measurment number is {0} \n  There are {1} blobs'.format(len(idx),len(blobs)))
     print('  {0} of them are alive\n\n'.format(len(live_blobs) ))
    
-
     if (len(idx)>0 or len(blobs)>0):
         Kalman_update(ori,ori_color,length,frame,flag)
     
@@ -411,7 +384,6 @@ def Kalman_update(ori,ori_color,length,frame,flag):
     ori_idx = []
     line_exist =0
 
-   
     for _,i in enumerate(live_blobs):
         if blobs[i].dtime <8:
             if blobs[i].status ==0:
@@ -420,8 +392,6 @@ def Kalman_update(ori,ori_color,length,frame,flag):
                 blobs[i].xp = np.dot(A,blobs[i].x_old.T)+np.dot(B,blobs[i].u)
             xcor.append(round(blobs[i].xp[1]))
             ycor.append(round(blobs[i].xp[0]))
-            
-
             blob_idx.append(i)
         else:
             blobs[i].status = 2
@@ -459,7 +429,6 @@ def Kalman_update(ori,ori_color,length,frame,flag):
     for _,i in enumerate(live_blobs):  
         if blobs[i].dtime<8:
             if len(ori)!=0:
-            
                 if i in blob_idx:
                     jj = oidx.index(live_blobs.index(i))                                          
                     ori[order[jj][0]][2:] = array([ori[order[jj][0]][0:2]])-blobs[i].ref[0][0:2]  #measure the velocity
@@ -472,33 +441,20 @@ def Kalman_update(ori,ori_color,length,frame,flag):
                     blobs[i].dtime += 1
             else:
                 blobs[i].dtime += 1
-
-            #ulx = int(round(blobs[i].xp[1]))
-            #lrx = int(round(blobs[i].xp[1]+blobs[i].len[1]))
-            #uly = int(round(blobs[i].xp[0]))
-            #lry = int(round(blobs[i].xp[0]+blobs[i].len[0]))
  
             ulx = int(blobs[i].xp[1]-blobs[i].len[1]/2)
             lrx = int(blobs[i].xp[1]+blobs[i].len[1]/2)
             uly = int(blobs[i].xp[0]-blobs[i].len[0]/2)
             lry = int(blobs[i].xp[0]+blobs[i].len[0]/2)
 
-
             # draw predict
             if ((lrx>=0) & (lry>=0) & (ulx<frame.shape[1]) & (uly<frame.shape[0])): #at least part of the obj inside the view 
-                #cv2.rectangle(frame,(max(ulx,0) ,max(uly,0)),\
-                #                    (min(lrx,frame.shape[1]),min(lry,frame.shape[0])),\
-                #                     blobs[i].Color(),1)
                 blobs[i].ivalue.append(frame[max(uly,0):min(lry,frame.shape[0]),\
                                              max(ulx,0):min(lrx,frame.shape[1]),:].flatten().mean())  #avarge itensity value in Bbox
                 trj_tmpx = copy.deepcopy(blobs[i].Trj['x'])
                 trj_tmpy = copy.deepcopy(blobs[i].Trj['y'])
-                     
-                #trj_tmpy.append( [ int(min(max(round(blobs[i].ref[0][0]+blobs[i].len[0]/2),0),frame.shape[0]))])
-                #trj_tmpx.append( [ int(min(max(round(blobs[i].ref[0][1]+blobs[i].len[1]/2),0),frame.shape[1]))])
                 trj_tmpy.append( [ int(min(max(blobs[i].ref[0][0],0),frame.shape[0]))])                          
                 trj_tmpx.append( [ int(min(max(blobs[i].ref[0][1],0),frame.shape[1]))]) 
-
             else:      #obj outside the view
                 trj_tmpx = copy.deepcopy(blobs[i].Trj['x'])
                 trj_tmpy = copy.deepcopy(blobs[i].Trj['y'])
@@ -519,7 +475,6 @@ def Kalman_update(ori,ori_color,length,frame,flag):
                     lines = axL.plot(blobs[i].Trj['x'][0:],blobs[i].Trj['y'][0:],\
                                      color = array(blobs[i].Color())[::-1]/255.,linewidth=2)
                 line_exist = 1   
- 
             if flag ==1:        
                 PP = np.dot(np.dot(A,blobs[i].P),A.T)+Q                    #covariance  
                 Y = blobs[i].ref.T-np.dot(H,blobs[i].xp)                            #residual 
@@ -550,7 +505,6 @@ def Kalman_update(ori,ori_color,length,frame,flag):
     left.set_data(frame)
     plt.draw()       
 
-
     if imsave:
         savename = '/home/andyc/image/tra/caraccident/c'+repr(vid_idx).zfill(3)+'.jpg'
         savefig(savename)
@@ -570,14 +524,11 @@ def Objmatch(objy,objx,ref,refc,L,W,im,length):
     cmtx = np.zeros((L,W))
     Wd = 0.5   #weight of distance
     Wc = 1-Wd  #weight of color
-
-
     
     for i in range(L):
         dmtx[i,:] =((objy - ref[i][0])**2+(objx - ref[i][1])**2).T
         cmtx[i,:] = Color_Dif(im,objx,objy,refc[i],length[i]) 
-    #if vid_idx >= 138 :  
-    #    pdb.set_trace()
+
     dmtx = dmtx/diag # normalize the distance by divid diag
     dmtx[dmtx>D_limit_s] = 10**6    
     cmtx = cmtx*Wc + dmtx*Wd
@@ -614,74 +565,9 @@ def Mdist(pc,mc):
     A = np.cov(array([pc,mc]).T)
     return mdist(pc,mc,np.dot(inv(np.dot(A.T,A)+Imtx),A.T))     
 
-
-'''
-fno = 0
-
-try:
-    vid
-except:
-    print('reading video...')
-    cap = cv2.VideoCapture('/home/andyc/TLC00005.AVI')
-    vid = []
-
-    if cap.isOpened():
-        rval,frame = cap.read()
-    else:
-        rval = False
-    while rval:
-        rval,frame = cap.read()
-        if rval:
-            frame = cv2.resize(frame,(0,0),fx = scale,fy=scale)            
-            vid.append(frame)
-            fno+=1
-
-    print('done reading video...')
-
-    print('There are {0} frames in this video...'.format(fno))
-
-mu       = np.zeros(vid[0].shape,dtype=float)
-mu_old   = np.zeros(vid[0].shape,dtype=float)
-sig2     = np.zeros(vid[0].shape,dtype=float)
-sig2_old = np.zeros(vid[0].shape,dtype=float)
-
-plt.figure(1,figsize=[20,10])
-axL = plt.subplot(121)
-left = plt.imshow(vid[0][:,:,::-1])
-axis('off')
-axR = plt.subplot(122)
-right = plt.imshow(mu,clim=[0,1],cmap = 'gist_gray',interpolation='nearest')
-axis('off')
-
-diag = (vid[0].shape[0]**2+vid[0].shape[1]**2)**0.5
-D_limit_s = ((SL*1000/3600/fps*C_len_p/C_len_r)**2*3)/diag  
-
-start = time.clock()
-
-vid_idx = 15220
-buf = double(array(vid[vid_idx -25:vid_idx +26]))
-
-Tf = (vid[0][:,:,1]>100) & (vid[0][:,:,0]<100)
-Tf = ndm.binary_closing(Tf,structure=np.ones((4,4)))
-Tf = ~ndm.binary_fill_holes(Tf)
-
-
-for frame in vid[15220:]:
-    print("frame no : {0}".format(vid_idx))
-    Fg = Fg_Extract(frame,6)
-    idx,lab_mtx,coor,cnt = Objextract(Fg)
-    Coor_Extract(idx,lab_mtx,frame,coor)
-    vid_idx = vid_idx+1
-end = time.clock()
-
-
-print("Total computation time is {0}".formate(start-end))
-
-'''
 import os,glob
 
 path ='/home/andyc/image/car accident/'
-#path ='/home/andyc/image/park/bip roof/'
 imlist = sorted(glob.glob( os.path.join(path, '*.jpg')))
 im = nd.imread(imlist[0])
 im = cv2.resize(im,(0,0),fx = scale,fy=scale)
@@ -711,16 +597,10 @@ for ii in range(len(imlist)):
     vid.append(frame)
 print('done reading frame...')
 
-
 for frame in vid[200:270]:
     print("frame no")
     print(vid_idx+15)
     Fg = Fg_Extract(frame,2.5)    
     idx,lab_mtx,coor,cnt = Objextract(Fg)
     Coor_Extract(idx,lab_mtx,frame,coor)
-    #if imsave:
-    #    savename = '/home/andyc/image/tra/Daycut/c'+repr(vid_idx).zfill(3)+'.jpg'
-    #    savefig(savename)
     vid_idx = vid_idx+1
-
-
