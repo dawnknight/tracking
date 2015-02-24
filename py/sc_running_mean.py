@@ -8,10 +8,9 @@ try:
     vid
 except:
     print('reading video...')
-    cap = cv2.VideoCapture('/home/andyc/VIDEO0004.mp4')
+    cap = cv2.VideoCapture('/home/andyc/crowd2.avi')
     vid = []
-
-    for _ in range(600):
+    for _ in range(448):
         ret, frame = cap.read()
         frame = cv2.resize(frame,(0,0),fx = 0.25,fy=0.25)  
         vid.append(frame)
@@ -34,10 +33,11 @@ right = plt.imshow(conf,clim=[0,1],cmap = 'gist_gray',interpolation='nearest')
 plt.subplot(223)
 right2 = plt.imshow(conf,clim=[0,1],cmap = 'gist_gray',interpolation='nearest')
 plt.subplot(224)
-right3 = plt.imshow(conf,clim=[0,1],interpolation='nearest')
+right3 = plt.imshow(conf,clim=[0,1],cmap = 'gist_gray',interpolation='nearest')
 
 
-
+#bg = imread('/home/andyc/Videos/Crowd_PETS09/S0_BG/Crowd_PETS09/S0/Background/View_001/Time_13-19/00000001.jpg')
+#bg = cv2.resize(bg,(0,0),fx = 0.25,fy=0.25)
 for frame in vid:
     mu[:]       = alpha*frame + (1.0-alpha)*mu_old
     mu_old[:]   = mu
@@ -49,7 +49,7 @@ for frame in vid:
     lmcs = lmc*sig
     bmcs = bmc*sig
     
-    fg= np.abs(1.0*frame-mu)[:,:,0]-2*sig[:,:,0]>0.0
+    fg= np.abs(1.0*frame-mu)[:,:,0]-1*sig[:,:,0]>0.0
     fgo = ndm.binary_opening(fg) 
     fgc = ndm.binary_closing(fg)
     fgf = ndm.binary_fill_holes(fgo)
@@ -60,8 +60,8 @@ for frame in vid:
     labeled_array, num_features = nd.measurements.label(fgf, structure=s)  
     coor = []
     cnt = []
-    lth = 200
-    Lth = 250000
+    lth = 50
+    Lth = 20000
     for i in range(1,num_features+1):
         coor.append(np.where(labeled_array==i))
         cnt.append(len(np.where(labeled_array==i)[1]))

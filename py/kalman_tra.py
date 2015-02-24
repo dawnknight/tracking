@@ -35,10 +35,14 @@ len_old = [0,0]
 flag = 1
 I = np.eye(4)
 
+Trj = {}   # trajectory
+Trj['0'] = [[0,0]]
+imsave = 0
 
 def coor_extract(idx,lab_mtx,frame,coor):
     global ori 
     global len_old
+
     if len(idx)==0:        
         left.set_data(frame[:,:,::-1])
         plt.draw()
@@ -87,7 +91,7 @@ def Kalman_update(ori,length,frame,flag):
 
     if kfinit == 0 :        
         xp = np.array([[0,0,0,0]]).T                   #predict x(initial)
-        kfinit =1
+        kfinit =1        
     else: 
         xp = np.dot(A,np.array([x[vid_idx-1,:]]).T)+np.dot(B,u) #predict x
 
@@ -101,6 +105,13 @@ def Kalman_update(ori,length,frame,flag):
     if ((ulx>=0.0) & (uly>=0.0) & (lrx<frame.shape[1]) & (lry<frame.shape[0])):
 
         cv2.rectangle(frame,(int(ulx),int(uly)),(int(lrx),int(lry)),(0,0,255),1)
+        trj_tmp = Trj['0']
+        trj_tmp.append([round((uly+lry)/2),round((ulx+lrx)/2)]) 
+        Trj['0'] = trj_tmp
+    else:
+        trj_tmp = Trj['0']
+        trj_tmp.append(trj_tmp[-1])
+        Trj['0'] = trj_tmp
 
     if flag ==1:
 
@@ -135,10 +146,15 @@ def Kalman_update(ori,length,frame,flag):
 
 
     left.set_data(frame[:,:,::-1])
-    plt.draw()        
 
-    imc = Image.fromarray(frame[:,:,::-1].astype(np.uint8))
-    imc.save('/home/andyc/image/tracking VIDEO0004/color/c%.3d.jpg'%vid_idx)
+    print(x[vid_idx,:])
+
+
+    plt.draw()
+        
+    if imsave:
+        imc = Image.fromarray(frame[:,:,::-1].astype(np.uint8))
+        imc.save('/home/andyc/image/tracking VIDEO0004/color/c%.3d.jpg'%vid_idx)
 
 
 def Fg_extract(frame): #extract foreground    
@@ -159,14 +175,16 @@ def Fg_extract(frame): #extract foreground
     right.set_data(fgf)
     plt.draw()
 
-    im = zeros(frame.shape)
-    a = fgf.astype(np.uint8)*255
-    im[:,:,0]=a
-    im[:,:,1]=a
-    im[:,:,2]=a
-
-    im = Image.fromarray(im.astype(np.uint8))
-    im.save('/home/andyc/image/tracking VIDEO0004/binary/b%.3d.jpg'%vid_idx)
+   
+    if imsave:
+        im = zeros(frame.shape)
+        a = fgf.astype(np.uint8)*255
+        im[:,:,0]=a
+        im[:,:,1]=a
+        im[:,:,2]=a
+        
+        im = Image.fromarray(im.astype(np.uint8))
+        im.save('/home/andyc/image/tracking VIDEO0004/binary/b%.3d.bmp'%vid_idx)
 
 
 
@@ -179,11 +197,11 @@ def objextract(Fg):
     coor = []
     cnt = []
 
-    if num_features ==1:
+    if num_features == 0:
        idx = []
     else:    
         lth = 200   # label pixel number less than lth will be removed
-        Lth = 60000
+        Lth = 6500
         for i in range(1,num_features+1):
             coor.append(np.where(labeled_array==i))
             cnt.append(len(np.where(labeled_array==i)[1]))
@@ -194,9 +212,12 @@ def objextract(Fg):
         idx = arange(num_features)
         idx = idx[(cnt<Lth)&(cnt>lth)]
       
-        if len(idx) == 0:
+        if len(idx)==0:
             idx = []
         else:
+            idx = [idx[cnt[idx].argmax()]]
+
+            '''   
             idx_max = 0
             for ii in range(len(idx)):
                 if cnt[idx[ii]]>idx_max:
@@ -205,7 +226,7 @@ def objextract(Fg):
                 idx = [] 
             else:
                 idx = [idx_max]
-
+            ''' 
     return idx,labeled_array,coor,cnt
 
 try:

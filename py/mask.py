@@ -2,6 +2,6 @@ import numpy as np
 import pickle
 import scipy.ndimage as nd
 
-mask = nd.imread('/home/andyc/image/000.jpg')[:,:,0]/255
-
-pickle.dump(mask,open('Feb11_mask2.pkl','wb'),True)
+mask = nd.imread('/home/andyc/image/test1.bmp')[:,:,0]/255
+imshow(mask,'gray')
+pickle.dump(mask,open('./mask/TLC0005_mask.pkl','wb'),True)

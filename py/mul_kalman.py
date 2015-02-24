@@ -48,7 +48,7 @@ def coor_extract(idx,lab_mtx,frame,coor):
     global len_old
 
     if len(idx)==0:        
-        left.set_data(uint8(frame))
+        left.set_data(frame[:,:,::-1])
         plt.draw()
         
         try:
@@ -89,7 +89,7 @@ def coor_extract(idx,lab_mtx,frame,coor):
             #draw
             cv2.rectangle(frame,(ulx,uly),(lrx,lry),(0,255,0),1)
             
-            left.set_data(uint8(frame))
+            left.set_data(frame[:,:,::-1])
             plt.draw()
 
             ori_old[i] = ori[i]
@@ -155,6 +155,15 @@ def Kalman_update(ori,length,frame,flag):
             except:
                trj_tmp =[[round((uly+lry)/2),round((ulx+lrx)/2)]]
             Trj[i] = trj_tmp 
+            '''
+            if kfinit ==0:
+                trj_tmp =[[round((uly+lry)/2),round((ulx+lrx)/2)]]
+            else:
+                pdb.set_trace()
+                trj_tmp = Trj[i]
+                trj_tmp.append([round((uly+lry)/2),round((ulx+lrx)/2)]) 
+            Trj[i] = trj_tmp
+            '''
         else:
             try:
                trj_tmp = Trj[i]
@@ -163,6 +172,14 @@ def Kalman_update(ori,length,frame,flag):
                trj_tmp =[[round((uly+lry)/2),round((ulx+lrx)/2)]]
             Trj[i] = trj_tmp
 
+            '''
+            if kfinit ==0:
+                trj_tmp =[[round((uly+lry)/2),round((ulx+lrx)/2)]]
+            else:
+                trj_tmp = Trj[i]
+                trj_tmp.append(trj_tmp[-1])
+            Trj[i] = trj_tmp
+            ''' 
         if flag ==1:
             try:
                 P[i]   
@@ -177,11 +194,32 @@ def Kalman_update(ori,length,frame,flag):
             x[i] = (xp[i]+np.dot(K,Y)).T
             #x[vid_idx,:] = (xp+np.dot(K,Y)).T
             P[i] = np.dot((I-np.dot(K,H)),PP)
+            #update velocity & accelation
+            
+            if vid_idx>0:
+                #pdb.set_trace()
+                x[i][0][2] = x[i][0][0]-x_old[i][0][0]
+                x[i][0][3] = x[i][0][1]-x_old[i][0][1]
+                u[i] = asarray([[x[i][0][2]-x_old[i][0][2],\
+                              x[i][0][3]-x_old[i][0][3],\
+                              x[i][0][2]-x_old[i][0][2],\
+                              x[i][0][3]-x_old[i][0][3]]]).T
+            
         else: # if measument  can not obtain
+
             x[i] = xp[i].T
-        #update velocity & accelation 
+            
+            if vid_idx>0:
+                x[i][0][2] = x_old[i][0][2]
+                x[i][0][3] = x_old[i][0][3]
+                u[i] = asarray([[x[i][0][2]-x_old[i][0][2],\
+                              x[i][0][3]-x_old[i][0][3],\
+                              x[i][0][2]-x_old[i][0][2],\
+                              x[i][0][3]-x_old[i][0][3]]]).T
+            
+        '''
         if vid_idx>0:
-            try :                                 
+            try :
                 x[i][0][2] = x_old[i][0][2]
                 x[i][0][3] = x_old[i][0][3]
                 u[i] = asarray([[x[i][0][2]-x_old[i][0][2],\
@@ -194,11 +232,14 @@ def Kalman_update(ori,length,frame,flag):
                 u[i] = asarray([[x[i][0][2],\
                                  x[i][0][3],\
                                  x[i][0][2],\
-                                 x[i][0][3]]]).T 
+                                 x[i][0][3]]]).T
+        '''
+
         x_old[i]=x[i]   
 
-    left.set_data(uint8(frame))
-    plt.draw()       
+    left.set_data(frame[:,:,::-1])
+    plt.draw()
+       
     kfinit = 1
  
     if imsave:
@@ -216,34 +257,38 @@ def Objmatch(objy,objx,ref,L):
     indexes = m.compute(cmtx)  
     return indexes
 
-def Fg_extract(frame,type = 1): #extract foreground    
 
-    if type ==1:
-        mu[:]       = alpha*frame + (1.0-alpha)*mu_old
-        mu_old[:]   = mu
-        sig2[:]     = alpha*(1.0*frame-mu)**2 + (1.0-alpha)*sig2_old
-        sig2_old[:] = sig2
-        
-        sig = sig2**0.5
-        
-        lmcs = lmc*sig
-        bmcs = bmc*sig
-        
-        fg= np.abs(1.0*frame-mu)[:,:,0]-1*sig[:,:,0]>0.0
-    elif type == 2:
-        try:
-            fg = np.abs(1.0*frame.mean(2)-BG)>50.0
-        except:
-            BG = pickle.load(open("bg13-19.pkl","rb"))
-            BG = cv2.resize(BG,(0,0),fx = 0.5,fy=0.5)
-            fg = np.abs(1.0*frame.mean(2)-BG)>50.0
-            
 
+
+
+def Fg_extract(frame): #extract foreground    
+
+    mu[:]       = alpha*frame + (1.0-alpha)*mu_old
+    mu_old[:]   = mu
+    sig2[:]     = alpha*(1.0*frame-mu)**2 + (1.0-alpha)*sig2_old
+    sig2_old[:] = sig2
+
+    sig = sig2**0.5
+
+    lmcs = lmc*sig
+    bmcs = bmc*sig
+
+    fg= np.abs(1.0*frame-mu)[:,:,0]-2*sig[:,:,0]>0.0
     fgo = ndm.binary_opening(fg)
     fgf = ndm.binary_fill_holes(fgo)
     right.set_data(fgf)
     plt.draw()
-       
+    '''
+    if imsave:
+        im = zeros(frame.shape)
+        a = fgf.astype(np.uint8)*255
+        im[:,:,0]=a
+        im[:,:,1]=a
+        im[:,:,2]=a
+        
+        im = Image.fromarray(im.astype(np.uint8))
+        im.save('/home/andyc/image/tracking VIDEO0004/binary/b%.3d.bmp'%vid_idx)
+    '''
     return fgf
         
 def objextract(Fg):
@@ -262,6 +307,8 @@ def objextract(Fg):
             coor.append(np.where(labeled_array==i))
             cnt.append(len(np.where(labeled_array==i)[1]))
 
+        #idx = list(set(np.where(asarray(cnt)<Lth)[0]).intersection\
+        #              (np.where(asarray(cnt)>lth)[0]))
         cnt = array(cnt)
         idx = arange(num_features)
         idx = idx[(cnt<Lth)&(cnt>lth)]
@@ -318,10 +365,9 @@ for frame in vid:
 
 import os,glob
 
-path ='/home/andyc/Videos/Crowd_PETS09/S0_BG/Crowd_PETS09/S0/Background/View_001/Time_13-19/'
+path ='/home/andyc/Videos/Crowd_PETS09/S0_BG/Crowd_PETS09/S0/Background/View_001/Time_13-06/'
 imlist = sorted(glob.glob( os.path.join(path, '*.jpg')))
 im = nd.imread(imlist[0])
-im = cv2.resize(im,(0,0),fx = 0.5,fy=0.5)
 mu       = np.zeros(im.shape,dtype=float)
 mu_old   = np.zeros(im.shape,dtype=float)
 sig2     = np.zeros(im.shape,dtype=float)
@@ -337,9 +383,8 @@ right = plt.imshow(mu,clim=[0,1],cmap = 'gist_gray',interpolation='nearest')
 for ii in range(len(imlist)):
     print("frame no")
     print(ii)
-    frame = nd.imread(imlist[ii])
-    frame = cv2.resize(frame,(0,0),fx = 0.5,fy=0.5)
-    Fg = Fg_extract(frame,2)
+    frame[:] = nd.imread(imlist[ii])
+    Fg = Fg_extract(frame)
     idx,lab_mtx,coor,cnt = objextract(Fg)
     coor_extract(idx,lab_mtx,frame,coor)
     vid_idx = vid_idx+1
