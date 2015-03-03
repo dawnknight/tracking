@@ -11,7 +11,7 @@ lk_params = dict( winSize  = (15, 15),
                     criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))
 
 feature_params = dict( maxCorners = 500,
-                       qualityLevel = 0.3,
+                       qualityLevel = 0.1,
                        minDistance = 7,
                        blockSize = 7 )
 
@@ -20,7 +20,7 @@ feature_params = dict( maxCorners = 500,
 
 video_src = '/home/andyc/Videos/jayst.mp4'
 
-viewmask = pickle.load(open("./mask/20150115-jayst_mask.pkl","rb"))
+viewmask = pickle.load(open("./mask/jayst_mask.pkl","rb"))
 
 
 
@@ -30,10 +30,10 @@ detect_interval = 5
 tracks = []
 cam = video.create_capture(video_src)
 fno = int(cam.get(cv2.cv.CV_CAP_PROP_FRAME_COUNT))
+nrow  = cam.get(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT)
+ncol  = cam.get(cv2.cv.CV_CAP_PROP_FRAME_WIDTH)
+
 frame_idx = 0
-traceidx = 0
-
-
 
 groups={}
 ptsidx = 0
@@ -89,7 +89,7 @@ def errcheck():
 
 
 def Initpts(tracks,tnum,del_pts,nobj=0,dth=30,vth = 2):
-    global ptsidx,objidx,traceidx
+    global ptsidx,objidx
 
     if ptsidx ==0:
         for i in range(len(tracks)):
@@ -99,10 +99,8 @@ def Initpts(tracks,tnum,del_pts,nobj=0,dth=30,vth = 2):
         ptsidx += len(tracks)
     else:
 
-        #if frame_idx >= 16:
-        #        pdb.set_trace()
 
-        if (tnum == len(tracks)) & (len(del_pts)==0) : # no pts change => simple update trj                                              
+        if (tnum == len(tracks)) & (len(del_pts)==0) : # no pts change => simple update trj                               
             for i in range(len(obj)):
                 if obj[i].status == 1:
                     Trj_idx = 0
@@ -114,7 +112,6 @@ def Initpts(tracks,tnum,del_pts,nobj=0,dth=30,vth = 2):
                     obj[i].Trj.append(mean(obj[i].pos,0))
                     obj[i].xTrj.append(int(mean(obj[i].pos,0)[0]))
                     obj[i].yTrj.append(int(mean(obj[i].pos,0)[1]))
-                    #pdb.set_trace()
                     obj[i].pos = []
                     obj[i].frame.append(frame_idx)
                     
@@ -165,6 +162,8 @@ def Initpts(tracks,tnum,del_pts,nobj=0,dth=30,vth = 2):
                     if i not in mobj:
                         offset = []
                         for k in obj[i].pts:
+                            if ((frame_idx == 2) & (i == 14) & (k==186)):
+                                pdb.set_trace()
 
                             ii = k-clist[k]     # maping old idx to new idx   
 
@@ -176,8 +175,6 @@ def Initpts(tracks,tnum,del_pts,nobj=0,dth=30,vth = 2):
                             offset.append(clist[k])                        
                         # -- group pts index update -- #         
                         obj[i].pts[:] = list(array(obj[i].pts)-array(offset))
-                        if traceidx ==1:
-                            pdb.set_trace()
 
                     else:
                        
@@ -303,8 +300,11 @@ def InitGrouping(tracks,pts,dth=30,vth=2):
 
 plt.figure(1,figsize=[10,12])
 axL = plt.subplot(1,1,1)
-frame = np.zeros([512,612,3]).astype('uint8')
-im = plt.imshow(np.zeros([512,612,3]))
+
+frame = np.zeros([nrow,ncol,3]).astype('uint8')
+im = plt.imshow(np.zeros([nrow,ncol,3]))
+
+
 axis('off')
 
 tdic = [0]
@@ -321,9 +321,10 @@ while (frame_idx<fno):
     
     ret, frame[:] = cam.read()
 
-    frame[:] = (((frame/255.)**0.5)*255).astype('uint8') 
+    #frame[:] = (((frame/255.)**0.5)*255).astype('uint8') 
+    
+    frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)#*viewmask 
 
-    frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)*viewmask
     vis = frame.copy()
 
     if len(tracks) > 0:
@@ -333,23 +334,30 @@ while (frame_idx<fno):
         p0r, st, err = cv2.calcOpticalFlowPyrLK(img1, img0, p1, None, **lk_params)
         d = abs(p0-p0r).reshape(-1, 2).max(-1)
         good = d < 1
+
+        tmppts = p1.reshape(-1, 2)
+        allpts = array([[int(tmppts[i][1]),int(tmppts[i][0])] for i in range(len(tmppts))])
+        inside = array([viewmask[allpts[i][0],allpts[i][0]] for i in range(len(allpts))])
+        goodinside = inside*good
+
         new_tracks = []
         del_pts = []
         idx = -1
 
-        for tr, (x, y), good_flag in zip(tracks, p1.reshape(-1, 2), good):
+        for tr, (x, y), good_flag in zip(tracks, tmppts, goodinside):
             idx += 1
 
             if not good_flag:  # feature gone
                 #pdb.set_trace()
                 del_pts.append(idx)                
                 continue
-
+            
+            
             tr.append((x, y))
             if len(tr) > track_len:
                 del tr[0]
             new_tracks.append(tr)
-            #cv2.circle(frame, (x, y), 2, (0, 255, 0), -1)
+            cv2.circle(frame, (x, y), 2, (0, 255, 0), -1)
         
 
         tmp = []
@@ -373,13 +381,13 @@ while (frame_idx<fno):
  
         
         for d in range(len(obj)):
-            if obj[d].status ==1:  
+            if ((obj[d].status ==1)):# & (d  in [12,16])):  
                 lines = axL.plot(obj[d].xTrj,obj[d].yTrj,color = array(obj[d].Color()[::-1])/255.,linewidth=2) 
                 line_exist = 1   
         plt.draw()        
 
-        name = '/home/andyc/image/jayst/gamma/'+str(frame_idx).zfill(5)+'.jpg'
-        savefig(name)
+        #name = '/home/andyc/image/AIG/trj/'+str(frame_idx).zfill(5)+'.jpg'
+        #savefig(name)
             
         while line_exist :    
             try:
@@ -395,6 +403,7 @@ while (frame_idx<fno):
         print('#delp   {0}'.format(len(del_pts)))
         print('#tracks {0}'.format(len(tracks)))
         print('err  {0}'.format(errcheck()))
+        print('{0} objs'.format(len(obj)))        
         print('######################\n')
 
 
@@ -425,4 +434,4 @@ while (frame_idx<fno):
 Tend = time.time()
 print('\ncomputation time is {0} sec ...\n'.format(Tend-Tstart))
 cv2.destroyAllWindows()
-pickle.dump(obj,open('./pkl/obj_jayst.pkl','wb'),True)
+#pickle.dump(obj,open('./pkl/obj_jayst.pkl','wb'),True)
