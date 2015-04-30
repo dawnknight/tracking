@@ -342,8 +342,6 @@ while (frame_idx<fno):
         good = d < 1
 
         tmppts = p1.reshape(-1, 2)
-        pdb.set_trace() 
-
         allpts = array([[int(tmppts[i][1]),int(tmppts[i][0])] for i in range(len(tmppts))]).T
         allpts[0][((allpts[0]>=nrow) | (allpts[0]<0))] = 0
         allpts[1][((allpts[1]>=ncol) | (allpts[1]<0))] = 0
@@ -364,11 +362,10 @@ while (frame_idx<fno):
                 #pdb.set_trace()
                 del_pts.append(idx)                
                 continue
-            '''
+            
             if not ((y >=ncol) or (y <0) or (y >=nrow) or (y <0)):
                 if viewmask[int(y),int(x)]:
                     cv2.circle(frame, (x, y), 2, (0, 255, 0), -1)
-            '''
 
 
             tr.append((x, y))
@@ -397,15 +394,9 @@ while (frame_idx<fno):
  
         
         for d in range(len(obj)):
-            if ((obj[d].status ==1) & (d  in [0])):  
+            if ((obj[d].status ==1)):# & (d  in [12,16])):  
                 lines = axL.plot(obj[d].xTrj,obj[d].yTrj,color = array(obj[d].Color()[::-1])/255.,linewidth=2) 
-                line_exist = 1
-                for ciridx in range(len(obj[0].ptsTrj)):
-                    (x,y) = obj[0].ptsTrj[ciridx][-1] 
-                    if not ((y >=ncol) or (y <0) or (y >=nrow) or (y <0)):                                                           
-                        if viewmask[int(y),int(x)]:                                                                                  
-                            cv2.circle(frame, (x, y), 2, (0, 255, 0), -1)
-   
+                line_exist = 1   
         plt.draw()        
 
         name = '/home/andyc/image/jayst/group/'+str(frame_idx).zfill(5)+'.jpg'

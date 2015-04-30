@@ -1,4 +1,4 @@
-import cv2
+import cv2,time
 from tkFileDialog import askopenfilename
 from tkFileDialog import askdirectory
 import matplotlib.pyplot as plt
@@ -86,10 +86,15 @@ def Createmask(frame,files):
                 name = mdname          
             savename = savepath+'/'+name+'_mask.pkl'
             print(savename)
-            pickle.dump(mask,open(savename,"wb"),True)
+            pickle.dump(uint8(mask),open(savename,"wb"),True)
             figure(),plt.imshow(mask,'gray')
             plt.title('mask')
             print('\n\n mask pkl file is already created and saved in '+savepath)
+            
+            time.sleep(6)
+            close('all')
+
+
         else:
             close(figure(2))
 

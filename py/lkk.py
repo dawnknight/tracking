@@ -23,13 +23,14 @@ import cv2,pdb,pickle
 import video
 from common import anorm2, draw_str
 from time import clock
+from scipy.io import savemat
 
 lk_params = dict( winSize  = (15, 15),
                   maxLevel = 2,
                   criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))
 
 feature_params = dict( maxCorners = 500,
-                       qualityLevel = 0.3,
+                       qualityLevel = 0.1,
                        minDistance = 7,
                        blockSize = 7 )
 
@@ -38,60 +39,65 @@ tdic = [0]
 
 class App:
     def __init__(self, video_src):
-        self.track_len = 50
+        self.track_len = 10
         self.detect_interval = 5
         self.tracks = []
-        self.cam = video.create_capture(video_src)
+        self.cam = cv2.VideoCapture(video_src)
+        self.nrows = self.cam.get(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT)
+        self.ncols = self.cam.get(cv2.cv.CV_CAP_PROP_FRAME_WIDTH)
         self.frame_idx = 0
-        #self.mask = viewmask = pickle.load(open(maskp,"rb"))
+        self.pregood = []
+        self.mask  = pickle.load(open("./mask/jayst_mask.pkl","rb"))
         
 
     def run(self):
         global idx
-        while True:
+        while (self.frame_idx <2400):
             ret, frame = self.cam.read()
-            #frame = (((frame/255.)**0.5)*255).astype('uint8')  
             frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)#*self.mask
+            mm = np.min(frame_gray.flatten())
+            MM = np.max((frame_gray-mm).flatten())
+            frame_gray = ((frame_gray-mm)/MM*255).astype('uint8')
+
+
             vis = frame.copy()
 
             if len(self.tracks) > 0:
                 img0, img1 = self.prev_gray, frame_gray
-                p0 = np.float32([tr[-1] for tr in self.tracks]).reshape(-1, 1, 2)
+                p0 = np.float32([tr[-1][:2] for tr in self.tracks  ]).reshape(-1, 1, 2)
                 p1, st, err = cv2.calcOpticalFlowPyrLK(img0, img1, p0, None, **lk_params)
                 p0r, st, err = cv2.calcOpticalFlowPyrLK(img1, img0, p1, None, **lk_params)
                 d = abs(p0-p0r).reshape(-1, 2).max(-1)
                 good = d < 1
-                new_tracks = []
+                
+                if (len(self.pregood)>0):
+                    good[:len(self.pregood)] = good[:len(self.pregood)]&good
+                    #good = (good & inroi)
+                    self.pregood = good
+                    
 
-
-                for tr, (x, y), good_flag in zip(self.tracks, p1.reshape(-1, 2), good):
+                for (x, y), good_flag, idx in zip(p1.reshape(-1, 2), good,range(len(self.tracks))):
                     if not good_flag:
+                        self.tracks[idx].append((-100., -100., self.frame_idx))
                         continue
-                    tr.append((x, y))
-                    if (x>=612 or y>=512):
-                        print('out of boundary!!')
 
-                    if len(tr) > self.track_len:
-                        del tr[0]
-                    new_tracks.append(tr)
+                    self.tracks[idx].append((x, y ,self.frame_idx))
+                    
                     cv2.circle(vis, (x, y), 3, (0, 0, 255), -1)
-
-                self.tracks = new_tracks
-                cv2.polylines(vis, [np.int32(tr) for tr in self.tracks], False, (0, 255, 0))
+                #cv2.polylines(vis, [np.int32(tr) for tr in self.tracks], False, (0, 255, 0))
                 draw_str(vis, (20, 20), 'track count: %d' % len(self.tracks))
 
             if self.frame_idx % self.detect_interval == 0:
 
                 mask = np.zeros_like(frame_gray)
                 mask[:] = 255
-                for x, y in [np.int32(tr[-1]) for tr in self.tracks]:
-                    cv2.circle(mask, (x, y), 5, 0, -1)
-
+                for x, y in [np.int32(tr[-1][:2]) for tr in self.tracks]:
+                    cv2.circle(mask, (x, y), 5, 0, -1)    
                 p = cv2.goodFeaturesToTrack(frame_gray, mask = mask, **feature_params)
           
                 if p is not None:
                     for x, y in np.float32(p).reshape(-1, 2):
-                        self.tracks.append([(x, y)])
+                        self.tracks.append([(x, y),self.frame_idx)])
 
             
             print('{0} - {1}'.format(self.frame_idx,len(self.tracks)))
@@ -99,31 +105,32 @@ class App:
             self.frame_idx += 1
             self.prev_gray = frame_gray
             cv2.imshow('lk_track', vis)
-            
-            name = '/home/andyc/image/AIG/lk/'+str(idx).zfill(5)+'.jpg'
+           
+            #save img
+            name = '/home/andyc/image/AIG/lking/'+str(idx).zfill(5)+'.jpg'
             cv2.imwrite(name,vis)
-            idx += 1
-            
+
+            idx += 1            
             
             tdic.append(len(self.tracks))
             ch = 0xFF & cv2.waitKey(1)
             if ch == 27:
                 break
-        return tdic
+        return tdic,self.tracks
 
 
 def main():
-    #import sys
-    #try: video_src = sys.argv[1]
-    #except: video_src = 0
-    
-    #viewmask = './mask/20150115-jayst_mask.pkl'
 
     video_src = '/home/andyc/Videos/jayst.mp4'
     print __doc__
-    ans=App(video_src).run()
+    ans,tracks=App(video_src).run()
     cv2.destroyAllWindows()
-    return ans 
+    return ans,tracks
+    trk ={}
+    trk['tracks'] = tracks
+
+    savemat('./mat/ptsTrj_in_g',trk)
+
 
 if __name__ == '__main__':
-    ans = main()
+    ans,tracks = main()

@@ -3,7 +3,7 @@ import scipy as sp
 import numpy as np
 from PIL import Image
 import scipy.ndimage as nd
-
+'''
 path = '/home/andyc/image/IR/EVENING/'
 imlist = sorted(glob.glob( os.path.join(path, '*.jpg')))
 im = nd.imread(imlist[0])[:,:,0]
@@ -33,3 +33,28 @@ bg = bg/w
 imshow(bg,cmap ='gray')
 
 pickle.dump(bg,open("bg_all.pkl","wb"),True)
+'''
+import cv2
+video_src = '/home/andyc/Videos/jayst.mp4'
+cam = cv2.VideoCapture(video_src)
+fno = int(cam.get(cv2.cv.CV_CAP_PROP_FRAME_COUNT))
+nrow  = cam.get(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT)
+ncol  = cam.get(cv2.cv.CV_CAP_PROP_FRAME_WIDTH)
+frame_idx = 0
+
+frame = np.zeros([nrow,ncol,3])
+bg = np.zeros([nrow,ncol,3])
+
+while (frame_idx<=683):
+    print('frame {0}\r'.format(frame_idx)),
+    sys.stdout.flush()
+    ret, frame[:] = cam.read()
+    if frame_idx>=673:
+        bg[:] = bg + frame
+    frame_idx += 1
+
+
+bg[:] = bg/11
+imshow(uint8(bg[:,:,::-1]),cmap ='gray')
+
+pickle.dump(uint8(bg[:,:,::-1]),open("jayst673_683_bg.pkl","wb"),True)

@@ -10,21 +10,20 @@ from scipy.ndimage.measurements import label
 # -- set the video name
 #dpath = '/home/andyc/Videos/'
 #fname = 'TLC00000.AVI'
-dpath = '/home/andyc/Videos/park/utilization_pilot_program/marcy_park_south/'
-fname = 'TLC00005.AVI'
-vidname = os.path.join(dpath,fname)
-vidname = '/home/andyc/Videos/TLC00000.AVI' 
-# --                                                                                                                                    
-#mask = pickle.load(open("./mask/TLC0005_mask.pkl","rb"))
+
+vidname = '/home/andyc/Videos/jayst.mp4'
+ 
+# --                                                                                                                                0
+mask = pickle.load(open("./mask/jayst_mask.pkl","rb"))
 #mask = pickle.load(open('./mask/20150115-jayst_mask.pkl','rb'))
 
 # -- utilities
-skip  = 7500
-nrow  = 480
-ncol  = 640
+skip  = 0
+nrow  = 512
+ncol  = 612
 nbuff = 241
 tind  = nbuff//2
-fac   = 8
+fac   = 4
 frame = np.zeros([nrow,ncol,3])
 img   = np.zeros([nrow,ncol,3])
 bkg   = np.zeros([nrow,ncol,3],dtype=float)
@@ -84,10 +83,10 @@ for ii in range(nbuff+2000):
 
     # calculate the difference image then rebin and smooth
     diff[:,:,:] = img-bkg
-    #diffb[:,:]  = gf((np.abs(diff).mean(2)*mask).reshape(nrow/fac,fac,ncol/fac,fac
-vxpts = (array(self.tracks[i]).T[0][1:-1] - array(self.tracks[i]).T[0][:-2])/vxth    #                                              ).mean(1).mean(-1),[3,1])
-    diffb[:,:]  = gf(np.abs(diff).mean(2).reshape(nrow/fac,fac,ncol/fac,fac
-                                                  ).mean(1).mean(-1),[3,1]) 
+    diffb[:,:]  = gf((np.abs(diff).mean(2)*mask).reshape(nrow/fac,fac,ncol/fac,fac
+                                                  ).mean(1).mean(-1),[1,1])
+    #diffb[:,:]  = gf(np.abs(diff).mean(2).reshape(nrow/fac,fac,ncol/fac,fac
+    #                                              ).mean(1).mean(-1),[1,1]) 
 
     
     # update plots by removing labels then updating
