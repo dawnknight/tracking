@@ -2,30 +2,30 @@ from scipy.io import loadmat
 import cv2,pickle,pdb
 from scipy.sparse import csr_matrix
 
-tracks = loadmat('./mat/ptsTrj.mat')['jayst'][0]
-sample = len(tracks)
-fnum   = len(tracks[0])
+#tracks = loadmat('./mat/ptsTrj.mat')['jayst'][0]
+#sample = len(tracks)
+#fnum   = len(tracks[0])
 
-#ptstrj = loadmat('./mat/ptsTrj.mat')
-#xtrj = csr_matrix(ptstrj['xtracks'], shape=ptstrj['xtracks'].shape).toarray()
-#ytrj = csr_matrix(ptstrj['ytracks'], shape=ptstrj['ytracks'].shape).toarray()
-#sample = ptstrj['xtracks'].shape[0]
-#fnum   = ptstrj['xtracks'].shape[1]
+ptstrj = loadmat('./mat/sparse_ptsTrj02test.mat')
+xtrj = csr_matrix(ptstrj['xtracks'], shape=ptstrj['xtracks'].shape).toarray()
+ytrj = csr_matrix(ptstrj['ytracks'], shape=ptstrj['ytracks'].shape).toarray()
+sample = ptstrj['xtracks'].shape[0]
+fnum   = ptstrj['xtracks'].shape[1]
 
 
 trk = np.zeros([sample,fnum,3])
 for i in range(sample):
-    trk[i,:,:] = tracks[i]
-    #trk[i,:,0] = xtrj[i]
-    #trk[i,:,1] = ytrj[i]
-    #trk[i,:,2] = arange(fnum)
+    #trk[i,:,:] = tracks[i]
+    trk[i,:,0] = xtrj[i]
+    trk[i,:,1] = ytrj[i]
+    trk[i,:,2] = arange(fnum)
 
-trk[trk<0]=0trk
+trk[trk<0]=0
 
-mask = loadmat('./mat/labelori.mat')['mask'][0]
+mask = loadmat('./mat/sparse_label02_trans.mat')['mask'][0]
 #mask = mask -1  # modify index from matlab to python           
                                                         
-labels = loadmat('./mat/labelori.mat')['label'][0]
+labels = loadmat('./mat/sparse_label02_trans.mat')['label'][0]
 #labels = loadmat('./mat/adjacency_matrix')['c'][0]
 
 mlabels = np.ones(sample)*-1
@@ -103,15 +103,16 @@ while (frame_idx <fnum):
             #lines = axL.plot(vcxtrj[k],vcytrj[k],color = (0,1,0),linewidth=2)
             #lines = axL.plot(vcxtrj[k],vcytrj[k],color = (color[k-1].T)/255.,linewidth=2)
             line_exist = 1
-            #dots.append(axL.scatter(vx, vy, s=50, color=(color[k-1].T)/255.,edgecolor='none')) 
-            dots.append(axL.scatter(x, y, s=50, color=(color[k-1].T)/255.,edgecolor='none')) 
-                                                      
+            #dots.append(axL.scatter(vx, vy, s=50, color=(color[k-1].T)/255.,edgecolor='black')) 
+            #dots.append(axL.scatter(x, y, s=50, color=(color[k-1].T)/255.,edgecolor='none')) 
+            dots.append(axL.scatter(x, y, s=50, color=(1,0,0),edgecolor='none'))
+                                         
     im.set_data(frame[:,:,::-1])
     plt.draw()
     plt.show()
 
-    #name = '/home/andyc/image/AIG/vtrj_spd9/'+str(frame_idx).zfill(4)+'.jpg'
-    #savefig(name)
+    name = '/home/andyc/image/AIG/elimated/'+str(frame_idx).zfill(4)+'.jpg'
+    savefig(name)
    
     
     while line_exist :

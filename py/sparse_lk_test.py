@@ -32,15 +32,12 @@ lk_params = dict( winSize  = (15, 15),
                   criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))
 
 feature_params = dict( maxCorners = 500,
-                       qualityLevel = 0.3,
+                       qualityLevel = 0.2,
                        minDistance = 7,
                        blockSize = 7 )
 
 idx = 0
 tdic = [0]
-
-
-alpha = 0.461
 
 class App:
     def __init__(self, video_src):
@@ -53,7 +50,7 @@ class App:
         self.ncols = self.cam.get(cv2.cv.CV_CAP_PROP_FRAME_WIDTH)
         self.frame_idx = 0
         self.pregood = []
-        self.mask  = pickle.load(open("./mask/jayst_mask.pkl","rb"))
+       
         
 
     def run(self):
@@ -82,16 +79,16 @@ class App:
                 #pdb.set_trace()
                 for (x, y), good_flag, idx in zip(p1.reshape(-1, 2), good,range(len(self.tracks))):
                     if not good_flag:
-                        self.tracks[idx].append((0., 0.,self.frame_idx))
+                        self.tracks[idx].append((-100., -100.,self.frame_idx))
                         #self.Ttracks[idx].append(self.frame_idx)
                         continue
 
-                    self.tracks[idx].append((x, y ,self.frame_idx))
+                    self.tracks[idx].append((x, y,self.frame_idx))
                     #self.Ttracks[idx].append(self.frame_idx)
 
                     cv2.circle(vis, (x, y), 3, (0, 0, 255), -1)
                 #cv2.polylines(vis, [np.int32(tr) for tr in self.tracks], False, (0, 255, 0))
-                draw_str(vis, (20, 20), 'track count: %d' % len(self.tracks))
+                #draw_str(vis, (20, 20), 'track count: %d' % len(self.tracks))
 
             if self.frame_idx % self.detect_interval == 0:
 
@@ -126,11 +123,19 @@ class App:
         Xtracks = np.zeros([len(self.tracks),self.frame_idx])
         Ytracks = np.zeros([len(self.tracks),self.frame_idx])
         #pdb.set_trace()
+        fbr = pickle.load(open('./mask/forbiddenregion_mask.pkl','rb'))
         for i in range(len(self.tracks)):
             k = array(self.tracks[i]).T
-            kidx = list(k[2])
-            Xtracks[i,:][kidx] = k[0]
-            Ytracks[i,:][kidx] = k[1]
+            kidx = list(k[2][k[0]!=-100])
+            xx = max(min(k[0][k[0]!=-100][-1],(self.ncols-1)),0)
+            yy = max(min(k[1][k[1]!=-100][-1],(self.nrows-1)),0)
+            #print xx,yy,i
+            if fbr[yy,xx] == 1: 
+                Xtracks[i,:][kidx] = k[0]
+                Ytracks[i,:][kidx] = k[1]
+            #Xtracks[i,:][kidx] = k[0]
+            #Ytracks[i,:][kidx] = k[1]
+            
 
         return tdic,Xtracks,Ytracks
 
@@ -155,6 +160,6 @@ if __name__ == '__main__':
     trk ={}
     trk['xtracks'] = csr_matrix(xtracks)
     trk['ytracks'] = csr_matrix(ytracks)
-    savemat('./mat/ptsTrj',trk)
+    savemat('./mat/sparse_ptsTrj02test',trk)
 
 

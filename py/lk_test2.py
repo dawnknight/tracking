@@ -122,14 +122,14 @@ class App:
                 #pdb.set_trace()
                 for (x, y), good_flag, idx in zip(p1.reshape(-1, 2), good,range(len(self.tracks))):
                     if not good_flag:
-                        self.tracks[idx].append((0., 0.))#, self.frame_idx))
+                        self.tracks[idx].append((-100., -100.))#, self.frame_idx))
                         continue
 
                     self.tracks[idx].append((x, y ))#,self.frame_idx))
                     
-                    cv2.circle(vis, (x, y), 3, (0, 0, 255), -1)
+                    #cv2.circle(vis, (x, y), 3, (0, 0, 255), -1)
                 #cv2.polylines(vis, [np.int32(tr) for tr in self.tracks], False, (0, 255, 0))
-                draw_str(vis, (20, 20), 'track count: %d' % len(self.tracks))
+                #draw_str(vis, (20, 20), 'track count: %d' % len(self.tracks))
 
             if self.frame_idx % self.detect_interval == 0:
 
@@ -149,7 +149,7 @@ class App:
 
             self.frame_idx += 1
             self.prev_gray = frame_gray
-            cv2.imshow('lk_track', vis)
+            #cv2.imshow('lk_track', vis)
             
             #name = '/home/andyc/image/AIG/lking/'+str(self.frame_idx).zfill(5)+'.jpg'
             #cv2.imwrite(name,vis)
@@ -185,4 +185,4 @@ if __name__ == '__main__':
     ans,tracks = main()
     trk ={}
     trk['tracks'] = tracks
-    savemat('./mat/ptsTrjori',trk)
+    savemat('./mat/ptsTrj_test',trk)

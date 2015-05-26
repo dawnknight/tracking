@@ -144,7 +144,7 @@ def visulize(data,labels,clf):
 if __name__ == '__main__':
 #    
 #    """With constructed adjacency matrix """
-    file = scipy_io.loadmat('./mat/adjacency_matrixori')
+    file = scipy_io.loadmat('./mat/sparse_adjacency_matrix02_trans')
     feature =(file['adj'] > 0).astype('float')
 #    pdb.set_trace()
     c = file['c']
@@ -183,7 +183,7 @@ if __name__ == '__main__':
     labelsave['mask']=mask
 
     from scipy.io import savemat
-    savemat('./mat/labelori',labelsave)
+    savemat('./mat/sparse_label02_trans',labelsave)
 
 
     """SSC clustering Andy Project"""

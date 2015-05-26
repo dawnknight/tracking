@@ -4,20 +4,17 @@ from scipy.sparse import csr_matrix
 import numpy as np
 import pdb
 
-ptstrj = loadmat('./mat/ptsTrjori.mat')
+ptstrj = loadmat('./mat/sparse_ptsTrj02test.mat')
 x = csr_matrix(ptstrj['xtracks'], shape=ptstrj['xtracks'].shape).toarray()
 y = csr_matrix(ptstrj['ytracks'], shape=ptstrj['ytracks'].shape).toarray()
-#sample = len(ptstrj)
-#fnum   = len(ptstrj[0])
+
 sample = ptstrj['xtracks'].shape[0]
 fnum   = ptstrj['xtracks'].shape[1]
 
-#x = np.zeros([sample,fnum])
-#y = np.zeros([sample,fnum])
 
-#for i in range(sample):
-#    x[i,:] = array(ptstrj[i]).T[0]
-#    y[i,:] = array(ptstrj[i]).T[1]
+x[x<0]=0
+y[y<0]=0
+
 
 xspeed = np.diff(x)*((x!=0)[:,1:])
 yspeed = np.diff(y)*((y!=0)[:,1:])
@@ -28,24 +25,30 @@ x_re = []
 y_re =[]
 xspd =[]
 yspd =[]
+minspdth = 9 #threshold of min speed
+fps = 4
+transth  = 60*fps   #transition time (red light time)
+
+
 
 print('initialization finished....')
-
+#pdb.set_trace()
 for i in range(sample):
     if sum(x[i,:]!=0)>4:  # chk if trj is long enough
         try:
-            if max(speed[i,:][x[i,1:]!=0][1:-1])>9:
-                mask.append(i)
-                x_re.append(x[i,:])
-                y_re.append(y[i,:])
-                xspd.append(xspeed[i,:])
-                yspd.append(yspeed[i,:])
+            if max(speed[i,:][x[i,1:]!=0][1:-1])>minspdth: # check if it is not a not move point
+                if sum(speed[i,:][x[i,1:]!=0][1:-1] < 3) < transth:  # check if it is a idole point
+                    mask.append(i)
+                    x_re.append(x[i,:])
+                    y_re.append(y[i,:])
+                    xspd.append(xspeed[i,:])
+                    yspd.append(yspeed[i,:])
         except:
             pass
 
 sample = len(x_re)
 adj = np.zeros([sample,sample])
-dth = 20
+dth = 30
 spdth = 5
 num = arange(fnum)
 x_re = array(x_re)
@@ -53,7 +56,9 @@ y_re = array(y_re)
 xspd = array(xspd)
 yspd = array(yspd)
 
+print(sample)
 print('building adj mtx ....')
+#pdb.set_trace()
 
 # build adjacent mtx
 for i in range(sample):
@@ -82,4 +87,4 @@ result['adj'] = adj
 result['c']   = c
 result['mask']= mask
 
-savemat('./mat/adjacency_matrixori',result)
+savemat('./mat/sparse_adjacency_matrix02_trans',result)

@@ -4,8 +4,8 @@ from scipy.sparse import csr_matrix
 import numpy as np
 import pdb
 
-#ptstrj = loadmat('./mat/ptsTrjori.mat')['tracks'][0]
-ptstrj = loadmat('./mat/ptsTrj.mat')['jayst'][0]
+ptstrj = loadmat('./mat/ptsTrjori.mat')['tracks'][0]
+#ptstrj = loadmat('./mat/ptsTrj.mat')['jayst'][0]
 sample = len(ptstrj)
 fnum   = len(ptstrj[0])
 
@@ -13,12 +13,12 @@ x = np.zeros([sample,fnum])
 y = np.zeros([sample,fnum])
 
 for i in range(sample):
-    #idx = len(ptstrj[i])
-    #x[i,-idx:] = array(ptstrj[i]).T[0]
-    #y[i,-idx:] = array(ptstrj[i]).T[1]
-    x[i,:] = array(ptstrj[i]).T[0]
-    y[i,:] = array(ptstrj[i]).T[1]
-trk
+    idx = len(ptstrj[i])
+    x[i,-idx:] = array(ptstrj[i]).T[0]
+    y[i,-idx:] = array(ptstrj[i]).T[1]
+    #x[i,:] = array(ptstrj[i]).T[0]
+    #y[i,:] = array(ptstrj[i]).T[1]
+
 x[x<0]=0
 y[y<0]=0
 xspeed = np.diff(x)*((x!=0)[:,1:])
